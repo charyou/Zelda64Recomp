@@ -178,9 +178,9 @@ RECOMP_PATCH void TransitionCircle_LoadAndSetTexture(Gfx** gfxp, TexturePtr text
     // @recomp Push the old RDP/RSP params.
     gEXPushProjectionMatrix(gfx++);
     gEXPushGeometryMode(gfx++);
-    gEXMatrixGroupSimple(gfx++, CIRCLE_OVERLAY_TRANSFORM_PROJECTION_ID, G_EX_PUSH, G_MTX_PROJECTION,
+    gEXMatrixGroupSimpleNeutral(gfx++, CIRCLE_OVERLAY_TRANSFORM_PROJECTION_ID, G_EX_PUSH, G_MTX_PROJECTION,
         G_EX_COMPONENT_INTERPOLATE, G_EX_COMPONENT_INTERPOLATE, G_EX_COMPONENT_INTERPOLATE, G_EX_COMPONENT_INTERPOLATE, G_EX_COMPONENT_INTERPOLATE, G_EX_ORDER_LINEAR, G_EX_EDIT_NONE);
-    gEXMatrixGroupSimple(gfx++, CIRCLE_OVERLAY_TRANSFORM_ID, G_EX_PUSH, G_MTX_MODELVIEW,
+    gEXMatrixGroupSimpleNeutral(gfx++, CIRCLE_OVERLAY_TRANSFORM_ID, G_EX_PUSH, G_MTX_MODELVIEW,
         G_EX_COMPONENT_INTERPOLATE, G_EX_COMPONENT_INTERPOLATE, G_EX_COMPONENT_INTERPOLATE, G_EX_COMPONENT_INTERPOLATE, G_EX_COMPONENT_INTERPOLATE, G_EX_ORDER_LINEAR, G_EX_EDIT_NONE);
 
     // @recomp Allocate a matrix and vertices in the displaylist because there's no handle to the GfxContext here.

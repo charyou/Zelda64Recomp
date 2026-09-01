@@ -310,11 +310,11 @@ static inline void tag_interpolate_effect(GraphicsContext* gfxCtx, u32 id) {
 static inline void tag_skip_effect(GraphicsContext* gfxCtx, u32 id) {
     OPEN_DISPS(gfxCtx);
 
-    gEXMatrixGroupSimple(POLY_OPA_DISP++, id, G_EX_PUSH, G_MTX_MODELVIEW,
+    gEXMatrixGroupSimpleNeutral(POLY_OPA_DISP++, id, G_EX_PUSH, G_MTX_MODELVIEW,
         G_EX_COMPONENT_SKIP, G_EX_COMPONENT_SKIP, G_EX_COMPONENT_SKIP,
         G_EX_COMPONENT_SKIP, G_EX_COMPONENT_INTERPOLATE, G_EX_ORDER_LINEAR, G_EX_EDIT_NONE);
     
-    gEXMatrixGroupSimple(POLY_XLU_DISP++, id + EFFECT_TRANSFORM_ID_COUNT, G_EX_PUSH, G_MTX_MODELVIEW,
+    gEXMatrixGroupSimpleNeutral(POLY_XLU_DISP++, id + EFFECT_TRANSFORM_ID_COUNT, G_EX_PUSH, G_MTX_MODELVIEW,
         G_EX_COMPONENT_SKIP, G_EX_COMPONENT_SKIP, G_EX_COMPONENT_SKIP,
         G_EX_COMPONENT_SKIP, G_EX_COMPONENT_INTERPOLATE, G_EX_ORDER_LINEAR, G_EX_EDIT_NONE);
 

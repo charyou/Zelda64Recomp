@@ -83,7 +83,7 @@ RECOMP_PATCH void EnTanron2_Draw(Actor* thisx, PlayState* play2) {
             Matrix_RotateZS(-D_80BB8458[i]->unk_14A, MTXMODE_APPLY);
 
             // @recomp Tag the transform.
-            gEXMatrixGroupSimple(POLY_XLU_DISP++, actor_transform_id(&D_80BB8458[i]->actor) + 0,
+            gEXMatrixGroupSimpleNeutral(POLY_XLU_DISP++, actor_transform_id(&D_80BB8458[i]->actor) + 0,
                 G_EX_PUSH, G_MTX_MODELVIEW,
                 G_EX_COMPONENT_INTERPOLATE, G_EX_COMPONENT_INTERPOLATE, G_EX_COMPONENT_INTERPOLATE, G_EX_COMPONENT_INTERPOLATE,
                 G_EX_COMPONENT_INTERPOLATE, G_EX_ORDER_LINEAR, G_EX_EDIT_NONE);
@@ -108,7 +108,7 @@ RECOMP_PATCH void EnTanron2_Draw(Actor* thisx, PlayState* play2) {
             Matrix_Scale(0.6f, 0.0f, 0.6f, MTXMODE_APPLY);
 
             // @recomp Tag the transform.
-            gEXMatrixGroupSimple(POLY_XLU_DISP++, actor_transform_id(tanron2) + 1,
+            gEXMatrixGroupSimpleNeutral(POLY_XLU_DISP++, actor_transform_id(tanron2) + 1,
                 G_EX_PUSH, G_MTX_MODELVIEW,
                 G_EX_COMPONENT_INTERPOLATE, G_EX_COMPONENT_INTERPOLATE, G_EX_COMPONENT_INTERPOLATE, G_EX_COMPONENT_INTERPOLATE,
                 G_EX_COMPONENT_INTERPOLATE, G_EX_ORDER_LINEAR, G_EX_EDIT_NONE);
@@ -138,7 +138,7 @@ RECOMP_PATCH void EnTanron2_Draw(Actor* thisx, PlayState* play2) {
             Matrix_Scale(D_80BB8454, 0.0f, D_80BB8454, MTXMODE_APPLY);
 
             // @recomp Tag the transform.
-            gEXMatrixGroupSimple(POLY_XLU_DISP++, actor_transform_id(tanron2) + 2,
+            gEXMatrixGroupSimpleNeutral(POLY_XLU_DISP++, actor_transform_id(tanron2) + 2,
                 G_EX_PUSH, G_MTX_MODELVIEW,
                 G_EX_COMPONENT_INTERPOLATE, G_EX_COMPONENT_INTERPOLATE, G_EX_COMPONENT_INTERPOLATE, G_EX_COMPONENT_INTERPOLATE,
                 G_EX_COMPONENT_INTERPOLATE, G_EX_ORDER_LINEAR, G_EX_EDIT_NONE);

@@ -9,7 +9,7 @@
 #include <concurrentqueue.h>
 
 #include "rt64_render_hooks.h"
-#include "rt64_render_interface_builders.h"
+#include "plume_render_interface_builders.h"
 #include "rt64_texture_cache.h"
 
 #include "RmlUi/Core/RenderInterfaceCompatibility.h"
@@ -270,7 +270,7 @@ public:
         }
 
         copy_command_queue_ = device->createCommandQueue(RT64::RenderCommandListType::COPY);
-        copy_command_list_ = copy_command_queue_->createCommandList(RT64::RenderCommandListType::COPY);
+        copy_command_list_ = copy_command_queue_->createCommandList();
         copy_command_fence_ = device->createCommandFence();
     }
 

@@ -3,12 +3,11 @@
 
 #include <memory>
 #include "recomp_ui.h"
+#include "common/rt64_plume.h"
 
 namespace RT64 {
-    struct RenderInterface;
-    struct RenderDevice;
-    struct RenderCommandList;
-    struct RenderFramebuffer;
+    // Keep Zelda's existing qualified names while Plume owns the render API.
+    using namespace plume;
 };
 
 namespace Rml {
