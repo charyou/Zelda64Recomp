@@ -3,6 +3,7 @@
 
 #include <unordered_set>
 #include <filesystem>
+#include <cstdint>
 
 #include "common/rt64_user_configuration.h"
 #include "ultramodern/renderer_context.hpp"
@@ -15,6 +16,18 @@ namespace RT64 {
 namespace zelda64 {
     namespace renderer {
         inline const std::string special_option_texture_pack_enabled = "_recomp_texture_pack_enabled";
+
+        struct EnvironmentFog {
+            bool valid = false;
+            uint8_t red = 0;
+            uint8_t green = 0;
+            uint8_t blue = 0;
+            int16_t fog_near = 0;
+            int16_t z_far = 0;
+        };
+
+        void set_environment_fog(const EnvironmentFog& fog);
+        EnvironmentFog get_environment_fog();
 
         class RT64Context final : public ultramodern::renderer::RendererContext {
         public:

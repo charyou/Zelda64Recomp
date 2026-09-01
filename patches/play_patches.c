@@ -1,6 +1,7 @@
 #include "play_patches.h"
 #include "z64debug_display.h"
 #include "input.h"
+#include "graphics.h"
 #include "prevent_bss_reordering.h"
 #include "z64.h"
 #include "regs.h"
@@ -77,6 +78,16 @@ RECOMP_PATCH void Play_Main(GameState* thisx) {
         autosave_post_play_update(this);
         this->state.gfxCtx = gfxCtx;
     }
+
+    // Publish Nintendo's fully resolved environment state. RT64 snapshots this
+    // as frame metadata; the compatibility renderer does not consume it.
+    recomp_set_environment_fog(
+        true,
+        ((u32)this->lightCtx.fogColor[0] << 16) |
+            ((u32)this->lightCtx.fogColor[1] << 8) |
+            (u32)this->lightCtx.fogColor[2],
+        this->lightCtx.fogNear,
+        this->lightCtx.zFar);
 
     {
         Input input = *CONTROLLER1(&this->state);

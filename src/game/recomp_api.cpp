@@ -177,3 +177,19 @@ extern "C" void recomp_set_right_analog_suppressed(uint8_t* rdram, recomp_contex
 
     recomp::set_right_analog_suppressed(suppressed);
 }
+
+extern "C" void recomp_set_environment_fog(uint8_t* rdram, recomp_context* ctx) {
+    const bool valid = _arg<0, u32>(rdram, ctx) != 0;
+    const u32 rgb = _arg<1, u32>(rdram, ctx);
+    const s32 fog_near = _arg<2, s32>(rdram, ctx);
+    const s32 z_far = _arg<3, s32>(rdram, ctx);
+
+    zelda64::renderer::set_environment_fog({
+        .valid = valid,
+        .red = static_cast<uint8_t>((rgb >> 16) & 0xFF),
+        .green = static_cast<uint8_t>((rgb >> 8) & 0xFF),
+        .blue = static_cast<uint8_t>(rgb & 0xFF),
+        .fog_near = static_cast<int16_t>(fog_near),
+        .z_far = static_cast<int16_t>(z_far),
+    });
+}

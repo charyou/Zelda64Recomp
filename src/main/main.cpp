@@ -670,6 +670,7 @@ int main(int argc, char** argv) {
     REGISTER_FUNC(recomp_get_mouse_deltas);
     REGISTER_FUNC(recomp_get_inverted_axes);
     REGISTER_FUNC(recomp_get_analog_inverted_axes);
+    REGISTER_FUNC(recomp_set_environment_fog);
     recompui::register_ui_exports();
     recomputil::register_data_api_exports();
 

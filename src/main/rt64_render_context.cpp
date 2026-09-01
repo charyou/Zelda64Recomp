@@ -2,6 +2,9 @@
 #include <cstring>
 #include <variant>
 #include <algorithm>
+#include <cstdlib>
+#include <mutex>
+#include <string_view>
 
 #define HLSL_CPU
 #include "hle/rt64_application.h"
@@ -18,6 +21,38 @@
 static RT64::UserConfiguration::Antialiasing device_max_msaa = RT64::UserConfiguration::Antialiasing::None;
 static bool sample_positions_supported = false;
 static bool high_precision_fb_enabled = false;
+
+namespace {
+    std::mutex environment_fog_mutex;
+    zelda64::renderer::EnvironmentFog environment_fog;
+
+    RT64::FogMode fog_mode_from_environment() {
+        const char* mode = std::getenv("ZELDA64RECOMP_FOG_MODE");
+        if (mode == nullptr) {
+            return RT64::FogMode::Original;
+        }
+
+        if (std::string_view(mode) == "faithful") {
+            return RT64::FogMode::FaithfulPerPixel;
+        }
+
+        if (std::string_view(mode) == "atmospheric") {
+            return RT64::FogMode::Atmospheric;
+        }
+
+        return RT64::FogMode::Original;
+    }
+}
+
+void zelda64::renderer::set_environment_fog(const EnvironmentFog& fog) {
+    std::lock_guard lock(environment_fog_mutex);
+    environment_fog = fog;
+}
+
+zelda64::renderer::EnvironmentFog zelda64::renderer::get_environment_fog() {
+    std::lock_guard lock(environment_fog_mutex);
+    return environment_fog;
+}
 
 static uint8_t DMEM[0x1000];
 static uint8_t IMEM[0x1000];
@@ -263,6 +298,7 @@ zelda64::renderer::RT64Context::RT64Context(uint8_t* rdram, ultramodern::rendere
     auto& cur_config = ultramodern::renderer::get_graphics_config();
     set_application_user_config(app.get(), cur_config);
     app->userConfig.developerMode = debug;
+    app->setFogMode(fog_mode_from_environment());
     // Force gbi depth branches to prevent LODs from kicking in.
     app->enhancementConfig.f3dex.forceBranch = true;
     // Scale LODs based on the output resolution.
@@ -320,6 +356,17 @@ zelda64::renderer::RT64Context::~RT64Context() = default;
 
 void zelda64::renderer::RT64Context::send_dl(const OSTask* task) {
     check_texture_pack_actions();
+    const EnvironmentFog environment = get_environment_fog();
+    RT64::AtmosphereParameters atmosphere{};
+    atmosphere.valid = environment.valid;
+    atmosphere.fogColor = hlslpp::float4(
+        environment.red / 255.0f,
+        environment.green / 255.0f,
+        environment.blue / 255.0f,
+        1.0f);
+    atmosphere.fogNear = static_cast<float>(environment.fog_near);
+    atmosphere.zFar = static_cast<float>(environment.z_far);
+    app->setAtmosphere(atmosphere);
     app->state->rsp->reset();
     app->interpreter->loadUCodeGBI(task->t.ucode & 0x3FFFFFF, task->t.ucode_data & 0x3FFFFFF, true);
     app->processDisplayLists(app->core.RDRAM, task->t.data_ptr & 0x3FFFFFF, 0, true);
