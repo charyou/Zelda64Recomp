@@ -5,6 +5,7 @@ This fork is incrementally modernizing Zelda64Recomp's renderer while preserving
 ## Required context
 
 - Read `HANDOFF.md` before substantial implementation work; it records the current build and runtime state.
+- Consult the newest detailed entry in `CHANGELOG-INTERNAL.md` when recent historical context is needed. `HANDOFF.md` remains authoritative for the current state.
 - Read `docs/DECISIONS.md` before changing renderer/game ownership boundaries.
 - The primary technical pre-research for the first graphics upgrade is `_working-directory/research/deep-research-report.md` when that local file is available.
 
@@ -36,6 +37,9 @@ This fork is incrementally modernizing Zelda64Recomp's renderer while preserving
 ## End-of-session memory
 
 - Rewrite `HANDOFF.md` with current facts after substantial work.
+- Prepend a concise entry to `CHANGELOG-INTERNAL.md` after a substantial session. Record outcomes, important discoveries, validation, open follow-ups, and relevant commits; do not turn it into a command or tool log.
+- Keep only the newest 3–4 sessions detailed in `CHANGELOG-INTERNAL.md`. Compact older entries into short summaries and link Git commits or durable documentation instead of retaining duplicate detail.
+- Treat `HANDOFF.md` as authoritative for the current state. Recent internal changelog entries provide historical context and must not override it.
 - Add durable cross-session operating lessons here only when they are broadly reusable.
 - Record consequential architecture choices in `docs/DECISIONS.md`; do not duplicate their full rationale here.
-- Follow the repository's release-note workflow for user-visible release history; do not use a changelog as an agent log.
+- Record all relevant user-visible changes in `CHANGELOG.md` through the release-note workflow described in its header; do not put internal session history there.
