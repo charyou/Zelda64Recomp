@@ -2,3 +2,19 @@
 <!-- Do not edit manually — your changes will be overwritten. -->
 <!-- To update the draft: ask the agent to use the draft-release-notes skill. -->
 <!-- To finalize a release: ask the agent to use the release-bump skill. -->
+
+## Unreleased
+
+### Added
+
+- Added experimental Faithful Per-Pixel and Atmospheric fog modes while retaining Original fog as the compatibility default. The modes can currently be tested with F5 or `ZELDA64RECOMP_FOG_MODE`.
+
+### Changed
+
+- Updated the embedded RT64 renderer to the qualified Plume baseline required for the modern fog work.
+- Atmospheric fog now uses resolved Majora's Mask environment color and distance data while preserving draw-local actor and effect fog.
+
+### Fixed
+
+- Fixed severe flickering and color and geometry corruption on AMD Radeon RX 9000-series GPUs caused by the initial modern-fog raster shader linkage.
+- Added automatic Vulkan selection for affected AMD RDNA4 GPUs to avoid a known Direct3D 12 startup crash.
