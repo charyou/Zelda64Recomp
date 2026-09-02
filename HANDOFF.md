@@ -7,76 +7,72 @@
 ## Current state
 
 - Working branch: `codex/rt64-modern-fog`.
-- Checkpoint `0faf84a` pins the clean RT64/Plume upgrade baseline to RT64 `5473732a822a4423b5696e7cb18fecc425a59875`.
-- RT64 local branch `codex/modern-fog` commit `c8ce62b` contains the validated RDNA4 raster-ABI fix and the upstream PR #265 D3D12-to-Vulkan compatibility fallback; it follows fog implementation commit `05394e9` on the qualified upstream baseline.
-- Recursive Plume checkout is `d890ac899e505fb30040e037a4037cdeca68f033`.
-- N64ModernRuntime local branch `codex/os-set-time-reimplementation` commit `222fbfd` points to N64Recomp `dfd4a2d`, which adds the already-supported `osSetTime` runtime translation to the reimplemented-function list.
-- Original is the default fog mode. Set `ZELDA64RECOMP_FOG_MODE` to `faithful` or `atmospheric` before launch, or press F5 to cycle Original → Faithful Per-Pixel → Atmospheric at runtime. F5 changes are printed to stdout.
+- The current fog-phase work is implemented but remains uncommitted in the project, RT64, and N64ModernRuntime worktrees.
+- Original remains the compatibility default. The Graphics menu now contains a persistent `Fog Rendering` selector with Original, Faithful, and Atmospheric choices. F5 still cycles the live RT64 mode temporarily and prints the result to stdout; `ZELDA64RECOMP_FOG_MODE=faithful|atmospheric` remains a launch-time debug override.
+- Final Clang/LLD Windows build succeeds at `_working-directory/build-zelda-clang/Zelda64Recompiled.exe`, including all DXIL and SPIR-V shader variants. The current build was produced at 2026-09-02 15:36 local time and launched for testing.
+- F1's Game editor has a nonpersistent `Atmosphere` tab with live controls and current-workload diagnostics. It displays the effective fog mode, MM fogNear/zFar, and semantic strength so visual A/B results can be tied to the actual environment request.
+- The newly tuned build is awaiting the user's final visual pass in the opening forest and following ordinary outdoor scene. The pause-menu corruption is already reported fixed. Do not begin Per-Pixel Lighting until the remaining fog pass is accepted or its findings are addressed.
 
-## What changed
+## Implemented fog behavior
 
-- Migrated Zelda's direct RT64 render-interface usage to Plume and updated Extended GBI MatrixGroup calls with behavior-neutral aspect/texcoord/LookAt semantics.
-- Retained current RT64 clipping/framebuffer/rect improvements and Zelda's existing resolution-scaled texture LOD configuration.
-- Added RT64 Workload fog mode and atmosphere metadata.
-- Added high-resolution-only raster fog gating using the existing Native-vs-enhanced `FramebufferRenderer` split.
-- Faithful mode reconstructs `tfPos.z/tfPos.w` from fragment `SV_Position.z` by inverting the draw's RSP viewport transform, then applies the draw-local `mul`/`offset` and existing N64 blender/fog color.
-- Mixed per-vertex fog-state draws retain Original vertex fog and emit a one-time diagnostic.
-- Added a recompiled-game ABI bridge that publishes resolved `PlayState.lightCtx` fog RGB, fogNear, and zFar before `Play_Draw`; `RT64Context::send_dl` latches them onto the current Workload.
-- Atmospheric mode classifies baseline environment draws by exact RSP fog signature plus fog color. Matching draws use an inline exponential distance extinction constrained by legacy onset and original zFar; local overrides use Faithful mode.
-- Atmospheric clip W is reconstructed from pixel-shader reciprocal `SV_Position.w`. Do not reintroduce the attempted `TEXCOORD1` fog-depth varying: it caused severe Vulkan corruption on RDNA4 and a D3D12 driver crash.
-- Added RT64's pending RDNA4 compatibility detection from upstream PR #265: RX 90xx uses Vulkan automatically because current D3D12 drivers are known broken.
-- Corrected the local N64Recomp symbol classification for `osSetTime`; without this, current N64ModernRuntime and the repository's older external CI recompiler both emit the game implementation and collide with the native runtime implementation at link time.
+- Original is untouched and remains the Native/RDRAM compatibility reference.
+- Faithful reconstructs the RSP NDC depth per fragment and applies the draw's exact legacy `mul`/`offset` response and fog color. It intentionally has no density multiplier.
+- The visible clarity difference between Original and Faithful is understood: Original clamps fog at vertices and interpolates the already-clamped values, so a near vertex at zero fog spreads extra fog across a large triangle. Faithful interpolates depth and clamps the same linear response at the pixel. The difference is geometry-dependent historical vertex sampling, not a missing global scale.
+- Atmospheric converts Faithful opacity to optical depth and redistributes a semantically gated part of that response into the physical height medium. It does not add an independent second fog curve on top of the complete legacy response.
+- The authored physical scale comes from the reconstructed world-space span between the legacy zero- and full-fog endpoints. The low layer uses exponential height-density integration, not a second arbitrary distance curve.
+- Zelda publishes MM's resolved `LightContext` fog RGB/fogNear/zFar plus `envCtx.sunPos`, `view.eye`, and the world-camera direction/reference height. `fogStrength = saturate((996 - fogNear) / 50)` reuses MM's own fog-influence signal from environment glare/lens-flare behavior.
+- Height density uses a scene-scaled 1.5% zFar scale height clamped to 35–240 world units. A smooth semantic fog-strength gate keeps fogNear near 996 effectively clear.
+- A bounded height-medium blend defaults to 22% in strongly foggy conditions and rises continuously to 38% near dawn, derived from MM's positive-X, near-horizon `sunPos`. The previous additive 30%/52% formulation was the cause of excessive opening-scene fog and has been removed rather than hidden behind a density multiplier.
+- Two-octave world-XZ value noise modulates existing low-layer density from 65–135% and drifts slowly. Noise never decides whether a scene is foggy.
+- Original `sunPos` also drives a subtle Henyey–Greenstein directional scattering response while MM's resolved fog RGB remains the in-scattering color.
+- The F1 live controls expose base and morning height-medium blend, scale-height/far-distance ratio, density variation, and directional scattering. They are intentionally session-local calibration controls; `Reset atmospheric defaults` restores the compiled values.
 
-## Validation / build status
+## Classification and pause-menu protection
 
-- Standalone RT64 `rt64` target builds successfully with MSVC/Ninja, including all modified DXIL and SPIR-V shader variants.
-- Zelda's embedded `rt64/rt64.lib` target builds successfully (428 build steps in the configured scratch tree).
-- A complete RelWithDebInfo Windows executable builds and links successfully at `_working-directory/build-zelda-clang/Zelda64Recompiled.exe` with Clang 19.1.3. The build generated 339 game C units, both RSP sources, 1,801 patch functions, all DXIL/SPIR-V shaders, and the final executable.
-- The supplied compressed US ROM SHA-1 is `D6133ACE5AFAA0882CF214CF88DABA39E266C078`; the locally decompressed build input SHA-1 is `7F5630DBC4D5D61D6276213210C4D5CDD83A47D6`. Both ROMs and all generated sources remain ignored/uncommitted.
-- Numerical viewport inversion check: 10,000 randomized viewport/fog samples reproduced the vertex-domain formula with maximum absolute error about `1.43e-14` in double precision.
-- `git diff --check` passes apart from checkout line-ending notices.
-- Runtime startup smoke tests passed for `original`, `faithful`, and `atmospheric`: each mode created a responsive `Zelda 64: Recompiled` window and remained alive through initialization.
-- The first real in-game three-mode capture passed on Windows with an AMD Radeon RX 9070 XT using Vulkan. Original, Faithful Per-Pixel, and Atmospheric all rendered without color or geometry corruption. The opening-forest capture showed Original and Atmospheric substantially denser than Faithful, which is now a tuning/classification question rather than a stability failure.
-- The initial shader implementation failed in-game: D3D12 crashed in `D3D12Core.dll` with `0xc0000005`; Vulkan produced alternating RGB-like corruption. HPFB Off and the Native/RDRAM view did not help. An A/B build that removed the new cross-stage varying rendered cleanly, proving the fault was the raster linkage change rather than the Plume migration, submodules, RDP buffer stride, or atmospheric parameter bridge.
-- CPU layout assertions pass for the extended structs: `RDPParams` is 176 bytes with new fields at offsets 128/144/160; `FramebufferParams` is 24 bytes with `enhancedRenderer` at offset 20. Generated SPIR-V uses the matching 176-byte RDP array stride.
+- Atmospheric may replace only draws whose RSP fog coefficients and RGB match the resolved environment baseline. Local actor/effect fog remains Faithful; mixed per-vertex fog states remain Original.
+- Atmospheric additionally requires an RT64 perspective projection whose inferred inverse-view camera position and +Z basis agree with MM's active world camera.
+- This camera-semantic gate is required because MM's pause inventory deliberately creates its own perspective `View` around `(0, 0, 64)`. Applying world-space height/noise reconstruction to it caused the reported rainbow/banding corruption. Secondary/UI cameras now fall back to Faithful automatically without scene IDs.
+- `docs/DECISIONS.md` ADR-002 and ADR-003 record the durable metadata and classification boundary.
 
-## Known issues and experimental behavior
+## Validation and evidence
 
-- Faithful and Atmospheric fog passed the opening-forest in-game capture but still need validation at transition, transparency, water, particle, Lens of Truth, framebuffer-feedback, UI, and HFR hotspots.
-- Real MM mixed-fog-index frequency is not yet known. Runtime instrumentation will report the first occurrence and safely fall back for that draw.
-- Atmospheric fog is deliberately a first lightweight model. It has distance extinction and aerial-perspective color through the N64 blender, but no world-height term yet.
-- The environment bridge can retain its last valid Play state briefly outside gameplay; exact signature classification makes accidental Atmospheric selection unlikely, but explicit game-state lifetime invalidation is a follow-up hardening task.
-- The A/B control is an environment variable plus F5, not yet a persistent launcher graphics option.
-- Atmospheric mode currently implements distance extinction/aerial-perspective color only. The planned subtle world-height density term was intentionally deferred until captures establish the distance model's baseline.
+- User captures established a genuinely fog-heavy case (opening forest/cutscene) and an ordinary low-fog noon outdoor case. The noon case remains nearly identical across modes because MM resolves fogNear close to 996 there; this is the required low-fog behavior, not a morning-only implementation. The first additive Atmospheric height layer was visibly too strong in the opening scene and was replaced with optical-depth redistribution.
+- The user also captured pause-menu RGB/banding corruption present in only one fog mode. Decompiled MM confirms that the pause menu uses a separate forced-perspective camera, supporting the new world-camera gate.
+- The user subsequently confirmed that the pause inventory looks correct with the camera-semantic gate.
+- The standalone shader generation pass succeeded for all modified DXIL and SPIR-V variants. Its later MSVC C++ phase lacked the Visual Studio include environment (`stddef.h`); this is unrelated to the changes and is superseded by the complete Clang application build.
+- The complete Clang build compiled and linked the new environment ABI, graphics configuration, RT64 CPU code, and every shader variant successfully.
+- `assets/config_menu/graphics.rml` parses as XML and all element IDs are unique.
+- CPU layout assertions pass for the extended `RDPParams`: 304 bytes; modern fog at 128, atmosphere params at 160, sun at 176, camera at 192, live tuning at 208/224, and inverse view-projection at 240.
+- `git diff --check` passes in the project, RT64, and N64ModernRuntime worktrees apart from expected line-ending notices.
 
-## Important discoveries
+## Required final visual pass
 
-- `RasterPS` receives RSP viewport-transformed NDC depth. Inverting `viewport.scale.z` and `viewport.translate.z` recovers the same domain used by `RSPProcessCS` fog evaluation.
-- `FramebufferRenderer(..., rtSupport=false, ...)` is the Native/RDRAM renderer; the Workload replay uses `rtSupport=true`. This is a clean shader-data gate without scale heuristics or shader permutation growth.
-- `PlayState.lightCtx`, rather than `EnvironmentContext.lightSettings`, is the resolved state consumed by `Play_SetFog` after MM environment adjustments.
-- `fogNear` is not interpreted as a world-space distance in Atmospheric mode. The legacy curve supplies authored onset while pre-quantization `zFar` supplies scene scale.
-- On AMD Radeon RX 9070 XT, adding a fog-depth `TEXCOORD1` varying to RT64's linked raster shaders corrupts Vulkan output and coincides with a D3D12 driver crash. Pixel-shader `SV_Position.w` already supplies reciprocal clip W, so `1 / abs(SV_Position.w)` provides the distance input without changing the stage-link ABI.
-- A non-recursive initial clone was not responsible for the runtime failure. All seven direct submodules and all 15 nested RT64 submodules were checked against their gitlink SHAs and matched exactly.
-- The raw Windows build tree is intentionally not a self-contained package. `BUILDING.md` requires launching from the repository root or copying `assets/` beside the executable; release workflows separately bundle `assets/` and `recompcontrollerdb.txt`.
-- The checked-in CI N64Recomp pin (`a13e5cff96686776b0e03baf23923e3c1927b770`) can compile this repository's patch ELF, while the newer runtime submodule tool can compile the base ROM. The old tool omits `osSetTime` from its reimplemented list; the newer tool crashes on the older patch configuration. The successful local build therefore used the exact CI tool for `patches.toml` and the corrected runtime-submodule tool for `us.rev1.toml`.
-- On Windows, configure the application with Clang/clang-cl. MSVC configuration reaches compilation but fails because upstream ultramodern passes Clang-style `-Wno-unused-parameter` to `cl.exe`.
+1. In the application Graphics menu select each `Fog Rendering` mode and Apply; close/reopen the menu once to confirm persistence.
+2. Press F1 and use the `Atmosphere` tab. Confirm the rendered mode and note fogNear/semantic strength for each comparison.
+3. In the opening forest compare Faithful and Atmospheric. Atmospheric should be lower-lying and spatially structured without the previous overall over-fogging. Tune the five controls live if necessary and record preferred values.
+4. Continue to the ordinary noon outdoor scene. Atmospheric should remain mostly clear; a semantic strength near zero explains why the modes converge there.
+5. Check one locally fogged actor/effect if convenient; it should retain Faithful per-draw fog rather than receive the environment height layer.
 
-## Failed approaches worth not repeating
+## Known limits and follow-ups
 
-- Do not build the root executable with configure-only placeholder recompilation/RSP sources; they can validate CMake configuration but not the game.
-- Do not use the CI-pinned N64Recomp binary for the base game without the `osSetTime` correction; the final link gets duplicate `osSetTime` definitions.
-- Do not use N64ModernRuntime's newer N64Recomp for this checkout's `patches.toml`; it fails in strict patch recompilation. Keep the two generator roles separate until their versions are unified.
-- Do not derive a Float Projection from a clean perspective formula alone. It would bypass MM's post-projection distortion.
-- Do not apply atmosphere as a fullscreen depth pass or replace draw-local fog with frame-global values; both break transparent/local effects.
+- This lightweight raster model attenuates visible surfaces using reconstructed world positions. It can produce convincing ground-hugging haze across terrain and objects, but cannot draw detached wisps in empty air. True free-volume fog would require fog geometry or a volumetric/froxel pass and is intentionally outside this phase.
+- A froxel implementation is feasible in RT64 but is a separate multi-pass renderer feature: it needs a view-aligned 3D density grid, depth-aware integration/composition, temporal stabilization, and explicit handling for N64 transparency, secondary projections, and local per-draw fog. MM decomp semantics can drive injection and visibility targets but do not eliminate that renderer work. Do not begin it until the lightweight model's final visual decision is made.
+- Camera-match tolerances are semantic and scene-independent but need the pending pause/cutscene visual pass. If a legitimate world cutscene falls back to Faithful, inspect its inferred view before loosening the gate.
+- F5 is intentionally a temporary nonpersistent developer A/B control; the Graphics menu is the authoritative persistent setting.
+- The environment bridge can retain its last valid Play state briefly outside gameplay. Fog signature plus world-camera matching now makes accidental Atmospheric selection substantially less likely; explicit lifetime invalidation remains optional hardening.
+- Full regression coverage is still desirable for water, transparency, particles, Lens of Truth, framebuffer feedback, transitions, and high framerates after the required visual pass.
 
-## Relevant commits / checkpoints
+## Build notes
 
-- `0faf84a` — clean exact RT64/Plume integration baseline.
-- `9b3d2a1` — Zelda environment bridge plus fog-mode integration and verified renderer/runtime gitlinks.
-- RT64 `05394e9` — enhanced raster fog modes, based on upstream `5473732a...`.
-- RT64 `c8ce62b` — preserve the raster linkage ABI, reconstruct clip W in the pixel shader, and apply the RDNA4 Vulkan fallback.
-- N64Recomp `dfd4a2d` / N64ModernRuntime `222fbfd` — route `osSetTime` through the existing runtime translation.
+- Full Windows builds use Clang/clang-cl. Add `_working-directory/tools`, LLVM 19.1.3, and Git's `usr/bin` and `mingw64/bin` to `PATH`, set `MSYS2_PATH_TYPE=inherit`, then build target `Zelda64Recompiled` in `_working-directory/build-zelda-clang`.
+- Base-ROM generation still uses N64ModernRuntime's corrected N64Recomp; patch generation still uses CI-pinned N64Recomp `a13e5cff96686776b0e03baf23923e3c1927b770`.
+- ROMs, generated recompilation sources, build products, captures, and diagnostics remain ignored under `_working-directory/`.
 
-## Next recommended step
+## Relevant checkpoints
 
-Finish the capture matrix at transition, transparency/water/particle, UI, framebuffer, Lens of Truth, and HFR hotspots. Compare Faithful against Original closely in the opening forest, inspect mixed-fog warnings/environment classification, then tune distance extinction and add a subtle optional world-height density term. Promote the fog mode into the persistent graphics UI only after those semantics are visually qualified. After fog is qualified, implement distortion-preserving Float View/Projection metadata.
+- Project `0faf84a`: qualified RT64/Plume integration baseline.
+- Project `9b3d2a1`: initial Zelda environment bridge and fog integration.
+- RT64 `05394e9`: initial enhanced raster fog modes.
+- RT64 `c8ce62b`: raster-linkage ABI preservation and RDNA4 Vulkan fallback.
+- Qualified upstream RT64 baseline: `5473732a822a4423b5696e7cb18fecc425a59875`.
+- N64Recomp `dfd4a2d` / N64ModernRuntime `222fbfd`: `osSetTime` runtime translation fix.

@@ -81,13 +81,28 @@ RECOMP_PATCH void Play_Main(GameState* thisx) {
 
     // Publish Nintendo's fully resolved environment state. RT64 snapshots this
     // as frame metadata; the compatibility renderer does not consume it.
-    recomp_set_environment_fog(
-        true,
-        ((u32)this->lightCtx.fogColor[0] << 16) |
-            ((u32)this->lightCtx.fogColor[1] << 8) |
-            (u32)this->lightCtx.fogColor[2],
-        this->lightCtx.fogNear,
-        this->lightCtx.zFar);
+    {
+        RecompEnvironmentFog fog = {
+            .valid = true,
+            .rgb = ((u32)this->lightCtx.fogColor[0] << 16) |
+                ((u32)this->lightCtx.fogColor[1] << 8) |
+                (u32)this->lightCtx.fogColor[2],
+            .fogNear = this->lightCtx.fogNear,
+            .zFar = this->lightCtx.zFar,
+            .sunX = this->envCtx.sunPos.x,
+            .sunY = this->envCtx.sunPos.y,
+            .sunZ = this->envCtx.sunPos.z,
+            .cameraX = this->view.eye.x,
+            .cameraY = this->view.eye.y,
+            .cameraZ = this->view.eye.z,
+            // guLookAt stores the camera's backward (+Z) basis, matching RT64's inverse-view row 2.
+            .viewX = this->view.eye.x - this->view.at.x,
+            .viewY = this->view.eye.y - this->view.at.y,
+            .viewZ = this->view.eye.z - this->view.at.z,
+            .referenceHeight = this->view.at.y,
+        };
+        recomp_set_environment_fog(&fog);
+    }
 
     {
         Input input = *CONTROLLER1(&this->state);

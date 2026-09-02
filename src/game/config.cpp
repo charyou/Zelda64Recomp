@@ -30,6 +30,7 @@ constexpr auto ar_default             = ultramodern::renderer::AspectRatio::Expa
 constexpr auto msaa_default           = ultramodern::renderer::Antialiasing::MSAA2X;
 constexpr auto rr_default             = ultramodern::renderer::RefreshRate::Display;
 constexpr auto hpfb_default           = ultramodern::renderer::HighPrecisionFramebuffer::Auto;
+constexpr auto fog_default            = ultramodern::renderer::FogMode::Original;
 constexpr int ds_default              = 1;
 constexpr int rr_manual_default       = 60;
 constexpr bool developer_mode_default = false;
@@ -100,6 +101,7 @@ namespace ultramodern {
             {"msaa_option",     config.msaa_option},
             {"rr_option",       config.rr_option},
             {"hpfb_option",     config.hpfb_option},
+            {"fog_option",      config.fog_option},
             {"rr_manual_value", config.rr_manual_value},
             {"developer_mode",  config.developer_mode},
         };
@@ -115,6 +117,7 @@ namespace ultramodern {
         config.msaa_option      = from_or_default(j, "msaa_option",     msaa_default);
         config.rr_option        = from_or_default(j, "rr_option",       rr_default);
         config.hpfb_option      = from_or_default(j, "hpfb_option",     hpfb_default);
+        config.fog_option       = from_or_default(j, "fog_option",      fog_default);
         config.rr_manual_value  = from_or_default(j, "rr_manual_value", rr_manual_default);
         config.developer_mode   = from_or_default(j, "developer_mode",  developer_mode_default);
     }
@@ -349,6 +352,7 @@ void reset_graphics_options() {
     new_config.msaa_option = msaa_default;
     new_config.rr_option = rr_default;
     new_config.hpfb_option = hpfb_default;
+    new_config.fog_option = fog_default;
     new_config.rr_manual_value = rr_manual_default;
     new_config.developer_mode = developer_mode_default;
     ultramodern::renderer::set_graphics_config(new_config);

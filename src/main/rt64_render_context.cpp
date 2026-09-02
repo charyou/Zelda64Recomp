@@ -26,10 +26,10 @@ namespace {
     std::mutex environment_fog_mutex;
     zelda64::renderer::EnvironmentFog environment_fog;
 
-    RT64::FogMode fog_mode_from_environment() {
+    RT64::FogMode fog_mode_from_environment(RT64::FogMode fallback) {
         const char* mode = std::getenv("ZELDA64RECOMP_FOG_MODE");
         if (mode == nullptr) {
-            return RT64::FogMode::Original;
+            return fallback;
         }
 
         if (std::string_view(mode) == "faithful") {
@@ -40,7 +40,18 @@ namespace {
             return RT64::FogMode::Atmospheric;
         }
 
-        return RT64::FogMode::Original;
+        return fallback;
+    }
+
+    const char* fog_mode_name(RT64::FogMode mode) {
+        switch (mode) {
+        case RT64::FogMode::FaithfulPerPixel:
+            return "Faithful Per-Pixel";
+        case RT64::FogMode::Atmospheric:
+            return "Atmospheric";
+        default:
+            return "Original";
+        }
     }
 }
 
@@ -160,6 +171,20 @@ RT64::UserConfiguration::InternalColorFormat to_rt64(ultramodern::renderer::High
     }
 }
 
+RT64::FogMode to_rt64(ultramodern::renderer::FogMode option) {
+    switch (option) {
+        case ultramodern::renderer::FogMode::FaithfulPerPixel:
+            return RT64::FogMode::FaithfulPerPixel;
+        case ultramodern::renderer::FogMode::Atmospheric:
+            return RT64::FogMode::Atmospheric;
+        case ultramodern::renderer::FogMode::Original:
+        case ultramodern::renderer::FogMode::OptionCount:
+            return RT64::FogMode::Original;
+    }
+
+    return RT64::FogMode::Original;
+}
+
 void set_application_user_config(RT64::Application* application, const ultramodern::renderer::GraphicsConfig& config) {
     switch (config.res_option) {
         default:
@@ -199,6 +224,7 @@ void set_application_user_config(RT64::Application* application, const ultramode
     application->userConfig.refreshRateTarget = config.rr_manual_value;
     application->userConfig.internalColorFormat = to_rt64(config.hpfb_option);
     application->userConfig.displayBuffering = RT64::UserConfiguration::DisplayBuffering::Triple;
+    application->setFogMode(to_rt64(config.fog_option));
 }
 
 ultramodern::renderer::SetupResult map_setup_result(RT64::Application::SetupResult rt64_result) {
@@ -298,7 +324,9 @@ zelda64::renderer::RT64Context::RT64Context(uint8_t* rdram, ultramodern::rendere
     auto& cur_config = ultramodern::renderer::get_graphics_config();
     set_application_user_config(app.get(), cur_config);
     app->userConfig.developerMode = debug;
-    app->setFogMode(fog_mode_from_environment());
+    const RT64::FogMode initialFogMode = fog_mode_from_environment(to_rt64(cur_config.fog_option));
+    app->setFogMode(initialFogMode);
+    fprintf(stdout, "RT64 fog mode: %s (Graphics menu; F5 temporarily cycles modes)\n", fog_mode_name(initialFogMode));
     // Force gbi depth branches to prevent LODs from kicking in.
     app->enhancementConfig.f3dex.forceBranch = true;
     // Scale LODs based on the output resolution.
@@ -366,6 +394,14 @@ void zelda64::renderer::RT64Context::send_dl(const OSTask* task) {
         1.0f);
     atmosphere.fogNear = static_cast<float>(environment.fog_near);
     atmosphere.zFar = static_cast<float>(environment.z_far);
+    atmosphere.sunDirection = hlslpp::float3(environment.sun_x, environment.sun_y, environment.sun_z);
+    atmosphere.cameraPosition = hlslpp::float3(environment.camera_x, environment.camera_y, environment.camera_z);
+    atmosphere.viewDirection = hlslpp::float3(environment.view_x, environment.view_y, environment.view_z);
+    atmosphere.referenceHeight = environment.reference_height;
+    // MM itself treats the final 50 fog-position units below ENV_FOGNEAR_MAX (996)
+    // as its continuous environmental fog influence for sun glare and lens flare.
+    // Reuse that authored signal here instead of inventing scene-specific thresholds.
+    atmosphere.fogStrength = std::clamp((996.0f - atmosphere.fogNear) / 50.0f, 0.0f, 1.0f);
     app->setAtmosphere(atmosphere);
     app->state->rsp->reset();
     app->interpreter->loadUCodeGBI(task->t.ucode & 0x3FFFFFF, task->t.ucode_data & 0x3FFFFFF, true);
@@ -392,6 +428,10 @@ bool zelda64::renderer::RT64Context::update_config(const ultramodern::renderer::
     }
 
     set_application_user_config(app.get(), new_config);
+
+    if (new_config.fog_option != old_config.fog_option) {
+        fprintf(stdout, "RT64 fog mode: %s\n", fog_mode_name(app->getFogMode()));
+    }
 
     app->updateUserConfig(true);
 

@@ -4,6 +4,30 @@
 > Einträge, die älter als 3–4 Sessions sind, werden zu Kurzfassungen kompaktiert.
 > Details stehen dann nur noch in der Git-History beziehungsweise den verlinkten Projektdokumenten.
 
+## 2026-09-02 — Fog-Kalibrierung, Höhennebel und persistente Grafikoption
+
+### Ergebnisse
+
+- Der Helligkeits-/Sichtweitenunterschied zwischen Original und Faithful ist aufgeklärt: Original begrenzt Fog an den Vertices und interpoliert anschließend, Faithful interpoliert Tiefe und begrenzt die identische lineare Antwort pro Pixel. Der geometrieabhängige Unterschied ist historisches Vertex-Sampling; Faithful erhielt bewusst keinen globalen Multiplikator.
+- Atmospheric überführt Faithful in optische Tiefe und verteilt einen semantisch gewichteten Anteil in ein Beer-Lambert-Höhenmedium um. Die zuvor versehentlich additive Kombination wurde nach dem Benutzerbefund „Intro zu stark“ entfernt; die Korrektur vermeidet echten Doppelnebel statt ihn mit einem Dichtemultiplikator zu kaschieren.
+- Eine exponentielle bodennahe Dichte, langsame Welt-XZ-Variation und ein aus `sunPos` abgeleiteter Morgenanteil wurden ergänzt. MM's bereits aufgelöste Fog-Farbe bleibt maßgeblich; Sonnenrichtung beeinflusst nur Dichteverteilung und subtile gerichtete Streuung.
+- Der Fog-Modus ist jetzt als persistente Option im normalen Grafikmenü verfügbar. Original bleibt Standard; F5 bleibt ein temporärer A/B-Zyklus.
+- Atmospheric verlangt neben der Environment-Fog-Signatur nun eine perspektivische Projektion, deren Kamera und Blickbasis MM's aktiver Weltkamera entsprechen. Dadurch erhalten lokale Effekte weiter Faithful und MM's separate Pause-Menü-Perspektivkamera keinen Weltnebel.
+- Im F1-Game-Editor gibt es einen nichtpersistenten `Atmosphere`-Tab: aktiver/gerenderter Modus, MM fogNear/zFar, semantische Stärke und fünf Live-Regler für Höhenblend, Skalenhöhe, Variation und gerichtete Streuung.
+
+### Evidenz und Validierung
+
+- Benutzer-Captures decken eine fog-starke Waldsequenz, eine gewöhnliche Low-Fog-Außenszene und den Atmospheric-spezifischen Pause-Menü-Streifenfehler ab.
+- Der Benutzer bestätigte die Pause-Menü-Korrektur. Die fast vollständige Modusgleichheit in der Mittags-Außenszene ist durch MM's nahezu inaktives Fog-Signal erwartungsgemäß; Atmospheric ist nicht generell an Morgenzeit gebunden.
+- Der separate lokale MM-Decomp bestätigt sowohl MM's 50-Einheiten-Fog-Influence als auch `sunPos` am Morgen und die erzwungene Pause-Perspektivkamera um `(0, 0, 64)`.
+- Vollständiger Clang/LLD-Windows-Build einschließlich aller DXIL-/SPIR-V-Varianten erfolgreich. Grafik-RML ist wohlgeformt, IDs sind eindeutig, Struct-Layout-Assertions und `git diff --check` bestehen.
+- Der vollständige Build mit optischer Umverteilung und Live-Reglern ist erfolgreich und läuft für den finalen Benutzer-Sichttest in Wald und normaler Außenszene. Bis zu dessen Abnahme beginnt keine Per-Pixel-Beleuchtung.
+
+### Dauerhafte Referenzen
+
+- Aktueller Stand und konkreter Sichttest: `HANDOFF.md`.
+- Workload-Metadaten und Weltkamera-Klassifikation: `docs/DECISIONS.md`, ADR-002/ADR-003.
+
 ## 2026-09-02 — Moderne Fog-Modi und RDNA4-Laufzeitqualifizierung
 
 ### Änderungen

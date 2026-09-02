@@ -24,6 +24,16 @@ namespace zelda64 {
             uint8_t blue = 0;
             int16_t fog_near = 0;
             int16_t z_far = 0;
+            float sun_x = 0.0f;
+            float sun_y = 1.0f;
+            float sun_z = 0.0f;
+            float camera_x = 0.0f;
+            float camera_y = 0.0f;
+            float camera_z = 0.0f;
+            float view_x = 0.0f;
+            float view_y = 0.0f;
+            float view_z = 1.0f;
+            float reference_height = 0.0f;
         };
 
         void set_environment_fog(const EnvironmentFog& fog);

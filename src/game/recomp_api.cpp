@@ -179,10 +179,18 @@ extern "C" void recomp_set_right_analog_suppressed(uint8_t* rdram, recomp_contex
 }
 
 extern "C" void recomp_set_environment_fog(uint8_t* rdram, recomp_context* ctx) {
-    const bool valid = _arg<0, u32>(rdram, ctx) != 0;
-    const u32 rgb = _arg<1, u32>(rdram, ctx);
-    const s32 fog_near = _arg<2, s32>(rdram, ctx);
-    const s32 z_far = _arg<3, s32>(rdram, ctx);
+    const gpr fog = _arg<0, PTR(u32)>(rdram, ctx);
+    const auto read_float = [rdram, fog](size_t index) {
+        union {
+            u32 word;
+            float value;
+        } converted = { static_cast<u32>(MEM_W(index * sizeof(u32), fog)) };
+        return converted.value;
+    };
+    const bool valid = MEM_W(0, fog) != 0;
+    const u32 rgb = MEM_W(sizeof(u32), fog);
+    const s32 fog_near = static_cast<s32>(MEM_W(2 * sizeof(u32), fog));
+    const s32 z_far = static_cast<s32>(MEM_W(3 * sizeof(u32), fog));
 
     zelda64::renderer::set_environment_fog({
         .valid = valid,
@@ -191,5 +199,15 @@ extern "C" void recomp_set_environment_fog(uint8_t* rdram, recomp_context* ctx) 
         .blue = static_cast<uint8_t>(rgb & 0xFF),
         .fog_near = static_cast<int16_t>(fog_near),
         .z_far = static_cast<int16_t>(z_far),
+        .sun_x = read_float(4),
+        .sun_y = read_float(5),
+        .sun_z = read_float(6),
+        .camera_x = read_float(7),
+        .camera_y = read_float(8),
+        .camera_z = read_float(9),
+        .view_x = read_float(10),
+        .view_y = read_float(11),
+        .view_z = read_float(12),
+        .reference_height = read_float(13),
     });
 }

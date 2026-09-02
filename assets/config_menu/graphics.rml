@@ -239,7 +239,7 @@
                                 data-checked="hr_option"
                                 value="Original"
                                 id="hr_original"
-                                style="nav-up: #msaa_none; nav-down: #apply_button"
+                                style="nav-up: #msaa_none; nav-down: #fog_original"
                             />
                             <label class="config-option__tab-label" for="hr_original">Original</label>
                             <input type="radio"
@@ -249,7 +249,7 @@
                                 data-checked="hr_option"
                                 value="Clamp16x9"
                                 id="hr_16_9"
-                                style="nav-up: #msaa_2x; nav-down: #apply_button"
+                                style="nav-up: #msaa_2x; nav-down: #fog_faithful"
                                 data-style-nav-up="msaa2x_supported ? '#msaa_2x' : '#msaa_none'"
                             />
                             <label class="config-option__tab-label" for="hr_16_9">16:9</label>
@@ -260,10 +260,46 @@
                                 data-checked="hr_option"
                                 value="Full"
                                 id="hr_full"
-                                style="nav-up: #msaa_4x; nav-down: #apply_button"
+                                style="nav-up: #msaa_4x; nav-down: #fog_atmospheric"
                                 data-style-nav-up="msaa4x_supported ? '#msaa_4x' : (msaa2x_supported ? '#msaa_2x' : '#msaa_none')"
                             />
                             <label class="config-option__tab-label" for="hr_full">Expand</label>
+                        </div>
+                    </div>
+
+                    <div class="config-option" data-event-mouseover="set_cur_config_index(7)">
+                        <label class="config-option__title">Fog Rendering</label>
+                        <div class="config-option__list">
+                            <input type="radio"
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(7)"
+                                name="fog-rendering"
+                                data-checked="fog_option"
+                                value="Original"
+                                id="fog_original"
+                                style="nav-up: #hr_original; nav-down: #apply_button"
+                            />
+                            <label class="config-option__tab-label" for="fog_original">Original</label>
+                            <input type="radio"
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(7)"
+                                name="fog-rendering"
+                                data-checked="fog_option"
+                                value="FaithfulPerPixel"
+                                id="fog_faithful"
+                                style="nav-up: #hr_16_9; nav-down: #apply_button"
+                            />
+                            <label class="config-option__tab-label" for="fog_faithful">Faithful</label>
+                            <input type="radio"
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(7)"
+                                name="fog-rendering"
+                                data-checked="fog_option"
+                                value="Atmospheric"
+                                id="fog_atmospheric"
+                                style="nav-up: #hr_full; nav-down: #apply_button"
+                            />
+                            <label class="config-option__tab-label" for="fog_atmospheric">Atmospheric</label>
                         </div>
                     </div>
 
@@ -302,6 +338,9 @@
                     <p data-if="cur_config_index == 6">
                         Adjusts the placement of HUD elements to fit the selected aspect ratio. <b>Expand</b> will use the aspect ratio of the game's output window.
                     </p>
+                    <p data-if="cur_config_index == 7">
+                        Selects how the game's authored fog is rendered. <b>Original</b> reproduces N64 vertex fog. <b>Faithful</b> evaluates the same response per pixel. <b>Atmospheric</b> adds height-aware aerial perspective and subtle world-space variation when Majora's Mask requests environmental fog.
+                    </p>
                 </div>
             </div>
             <div class="config__footer">
@@ -314,7 +353,7 @@
                         data-attrif-disabled="!options_changed"
                         onclick="apply_options"
                         id="apply_button"
-                        style="nav-up:#hr_original"
+                        style="nav-up:#fog_original"
                     >
                         <div class="button__label">Apply<span class="prompt-font-sm">{{gfx_help__apply}}</span></div>
                     </button>

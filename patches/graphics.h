@@ -8,6 +8,23 @@ DECLARE_FUNC(float, recomp_get_target_aspect_ratio, float);
 DECLARE_FUNC(s32, recomp_get_target_framerate, s32);
 DECLARE_FUNC(s32, recomp_high_precision_fb_enabled);
 DECLARE_FUNC(float, recomp_get_resolution_scale);
-DECLARE_FUNC(void, recomp_set_environment_fog, u32, u32, s32, s32);
+typedef struct RecompEnvironmentFog {
+    u32 valid;
+    u32 rgb;
+    s32 fogNear;
+    s32 zFar;
+    float sunX;
+    float sunY;
+    float sunZ;
+    float cameraX;
+    float cameraY;
+    float cameraZ;
+    float viewX;
+    float viewY;
+    float viewZ;
+    float referenceHeight;
+} RecompEnvironmentFog;
+
+DECLARE_FUNC(void, recomp_set_environment_fog, RecompEnvironmentFog* fog);
 
 #endif
