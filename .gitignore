@@ -1,3 +1,6 @@
+# Fork Working Directory
+_working-directory/
+
 # VSCode file settings
 .vscode/settings.json
 .vscode/c_cpp_properties.json
