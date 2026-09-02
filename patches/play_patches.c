@@ -97,10 +97,18 @@ RECOMP_PATCH void Play_Main(GameState* thisx) {
             .cameraZ = this->view.eye.z,
             // guLookAt stores the camera's backward (+Z) basis, matching RT64's inverse-view row 2.
             .viewX = this->view.eye.x - this->view.at.x,
-            .viewY = this->view.eye.y - this->view.at.y,
-            .viewZ = this->view.eye.z - this->view.at.z,
-            .referenceHeight = this->view.at.y,
-        };
+              .viewY = this->view.eye.y - this->view.at.y,
+              .viewZ = this->view.eye.z - this->view.at.z,
+              .referenceHeight = this->view.at.y,
+              // A visible scene sky in a normal room is a conservative, scene-ID-independent
+              // indication that clear-air atmosphere may be applied to the world camera.
+              .outdoor = (this->skyboxId != SKYBOX_NONE) && !this->envCtx.skyboxDisabled &&
+                  (this->roomCtx.curRoom.behaviorType1 == ROOM_BEHAVIOR_TYPE1_0),
+              .rain = this->envCtx.precipitation[PRECIP_RAIN_CUR],
+              .snow = this->envCtx.precipitation[PRECIP_SNOW_CUR],
+              .storm = (this->envCtx.stormState == STORM_STATE_ON) ||
+                  (this->envCtx.lightningState != LIGHTNING_OFF),
+          };
         recomp_set_environment_fog(&fog);
     }
 

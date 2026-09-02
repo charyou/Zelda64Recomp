@@ -23,6 +23,10 @@ typedef struct RecompEnvironmentFog {
     float viewY;
     float viewZ;
     float referenceHeight;
+    u32 outdoor;
+    u32 rain;
+    u32 snow;
+    u32 storm;
 } RecompEnvironmentFog;
 
 DECLARE_FUNC(void, recomp_set_environment_fog, RecompEnvironmentFog* fog);

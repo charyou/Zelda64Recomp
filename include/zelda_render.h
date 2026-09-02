@@ -34,6 +34,10 @@ namespace zelda64 {
             float view_y = 0.0f;
             float view_z = 1.0f;
             float reference_height = 0.0f;
+            bool outdoor = false;
+            uint8_t rain = 0;
+            uint8_t snow = 0;
+            bool storm = false;
         };
 
         void set_environment_fog(const EnvironmentFog& fog);

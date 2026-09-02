@@ -398,6 +398,13 @@ void zelda64::renderer::RT64Context::send_dl(const OSTask* task) {
     atmosphere.cameraPosition = hlslpp::float3(environment.camera_x, environment.camera_y, environment.camera_z);
     atmosphere.viewDirection = hlslpp::float3(environment.view_x, environment.view_y, environment.view_z);
     atmosphere.referenceHeight = environment.reference_height;
+    atmosphere.outdoorStrength = environment.outdoor ? 1.0f : 0.0f;
+    const float rainStrength = std::clamp(environment.rain / 60.0f, 0.0f, 1.0f);
+    const float snowStrength = std::clamp(environment.snow / 128.0f, 0.0f, 1.0f) * 0.65f;
+    atmosphere.weatherStrength = std::max(rainStrength, snowStrength);
+    if (environment.storm) {
+        atmosphere.weatherStrength = std::max(atmosphere.weatherStrength, 0.75f);
+    }
     // MM itself treats the final 50 fog-position units below ENV_FOGNEAR_MAX (996)
     // as its continuous environmental fog influence for sun glare and lens flare.
     // Reuse that authored signal here instead of inventing scene-specific thresholds.

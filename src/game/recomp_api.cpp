@@ -206,8 +206,12 @@ extern "C" void recomp_set_environment_fog(uint8_t* rdram, recomp_context* ctx) 
         .camera_y = read_float(8),
         .camera_z = read_float(9),
         .view_x = read_float(10),
-        .view_y = read_float(11),
-        .view_z = read_float(12),
-        .reference_height = read_float(13),
-    });
-}
+          .view_y = read_float(11),
+          .view_z = read_float(12),
+          .reference_height = read_float(13),
+          .outdoor = MEM_W(14 * sizeof(u32), fog) != 0,
+          .rain = static_cast<uint8_t>(MEM_W(15 * sizeof(u32), fog)),
+          .snow = static_cast<uint8_t>(MEM_W(16 * sizeof(u32), fog)),
+          .storm = MEM_W(17 * sizeof(u32), fog) != 0,
+      });
+  }

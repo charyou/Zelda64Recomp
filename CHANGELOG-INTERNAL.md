@@ -10,18 +10,22 @@
 
 - Der Helligkeits-/Sichtweitenunterschied zwischen Original und Faithful ist aufgeklärt: Original begrenzt Fog an den Vertices und interpoliert anschließend, Faithful interpoliert Tiefe und begrenzt die identische lineare Antwort pro Pixel. Der geometrieabhängige Unterschied ist historisches Vertex-Sampling; Faithful erhielt bewusst keinen globalen Multiplikator.
 - Atmospheric überführt Faithful in optische Tiefe und verteilt einen semantisch gewichteten Anteil in ein Beer-Lambert-Höhenmedium um. Die zuvor versehentlich additive Kombination wurde nach dem Benutzerbefund „Intro zu stark“ entfernt; die Korrektur vermeidet echten Doppelnebel statt ihn mit einem Dichtemultiplikator zu kaschieren.
-- Eine exponentielle bodennahe Dichte, langsame Welt-XZ-Variation und ein aus `sunPos` abgeleiteter Morgenanteil wurden ergänzt. MM's bereits aufgelöste Fog-Farbe bleibt maßgeblich; Sonnenrichtung beeinflusst nur Dichteverteilung und subtile gerichtete Streuung.
+- Eine exponentielle bodennahe Dichte, entlang des Sichtstrahls gemittelte langsame Welt-XZ-Variation und ein aus `sunPos` abgeleiteter Morgenanteil wurden ergänzt. Ein optisches Headroom-Budget bildet die Benutzer-Kalibrierung `strength 1.0 -> ~0.02` und `strength 0.2 -> ~0.065` kontinuierlich ab. MM's bereits aufgelöste Fog-Farbe bleibt maßgeblich.
+- Sichtbare Outdoor-Weltkameras erhalten eine schwache Clear-Air-Aerial-Perspective als Transmittanz-Untergrenze am MM-zFar. Aktuelle Regen-/Schneemengen sowie Sturm/Blitz erhöhen sie kontinuierlich; Innenräume und lokale Fog-Overrides bleiben ausgeschlossen.
 - Der Fog-Modus ist jetzt als persistente Option im normalen Grafikmenü verfügbar. Original bleibt Standard; F5 bleibt ein temporärer A/B-Zyklus.
 - Atmospheric verlangt neben der Environment-Fog-Signatur nun eine perspektivische Projektion, deren Kamera und Blickbasis MM's aktiver Weltkamera entsprechen. Dadurch erhalten lokale Effekte weiter Faithful und MM's separate Pause-Menü-Perspektivkamera keinen Weltnebel.
-- Im F1-Game-Editor gibt es einen nichtpersistenten `Atmosphere`-Tab: aktiver/gerenderter Modus, MM fogNear/zFar, semantische Stärke und fünf Live-Regler für Höhenblend, Skalenhöhe, Variation und gerichtete Streuung.
+- Im F1-Game-Editor gibt es einen nichtpersistenten `Atmosphere`-Tab: Modus, MM fogNear/zFar, semantische Stärke, Outdoor-/Wetterdiagnostik und acht Live-Regler einschließlich optischem Sättigungsbudget sowie Clear-/Wet-Air-Transmittanz.
 
 ### Evidenz und Validierung
 
 - Benutzer-Captures decken eine fog-starke Waldsequenz, eine gewöhnliche Low-Fog-Außenszene und den Atmospheric-spezifischen Pause-Menü-Streifenfehler ab.
 - Der Benutzer bestätigte die Pause-Menü-Korrektur. Die fast vollständige Modusgleichheit in der Mittags-Außenszene ist durch MM's nahezu inaktives Fog-Signal erwartungsgemäß; Atmospheric ist nicht generell an Morgenzeit gebunden.
+- Ein erster Test der neuen Clear-Air-Schicht zeigt nun klare Modusunterschiede und ein gutes normales Outdoor-Bild. Gerichtete Streuung ist sichtbar und gestalterisch wirksam; Regen/Sturm sowie der automatisch begrenzte dichte Intro-Nebel stehen noch aus.
 - Der separate lokale MM-Decomp bestätigt sowohl MM's 50-Einheiten-Fog-Influence als auch `sunPos` am Morgen und die erzwungene Pause-Perspektivkamera um `(0, 0, 64)`.
 - Vollständiger Clang/LLD-Windows-Build einschließlich aller DXIL-/SPIR-V-Varianten erfolgreich. Grafik-RML ist wohlgeformt, IDs sind eindeutig, Struct-Layout-Assertions und `git diff --check` bestehen.
 - Der vollständige Build mit optischer Umverteilung und Live-Reglern ist erfolgreich und läuft für den finalen Benutzer-Sichttest in Wald und normaler Außenszene. Bis zu dessen Abnahme beginnt keine Per-Pixel-Beleuchtung.
+- Die Upstream-Trennung bleibt erhalten: Projektcommit `0faf84a` ist das reine RT64-Upgrade direkt auf `dev`; Fog beginnt separat mit `9b3d2a1`/RT64 `05394e9`. Ein Maintenance-PR kann daher zunächst nur das Renderer-Upgrade übernehmen.
+- Die lokalen Fog-RT64- und N64ModernRuntime-Stände sind über deren konfigurierte Upstream-Remotes nicht erreichbar; vor Veröffentlichung eines Fog-Superproject-Branches müssen die Gitlinks auf zugängliche Fork-Commits zeigen.
 
 ### Dauerhafte Referenzen
 
