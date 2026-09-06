@@ -48,6 +48,7 @@ namespace zelda64 {
             float saturated_fog_height_budget = 0.03f;
             float clear_air_far_transmittance = 0.90f;
             float wet_air_far_transmittance = 0.65f;
+            float water_influence = 0.0f;
         };
 
         void set_environment_fog(const EnvironmentFog& fog);

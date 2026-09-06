@@ -36,7 +36,12 @@ Available fields are:
 | `RECOMP_ATMOSPHERE_OVERRIDE_CLEAR_AIR_TRANSMITTANCE` | `clearAirFarTransmittance` | 0.90 | Outdoor clear-air transmittance at the resolved far distance; lower means more haze. |
 | `RECOMP_ATMOSPHERE_OVERRIDE_WET_AIR_TRANSMITTANCE` | `wetAirFarTransmittance` | 0.65 | Fully wet/stormy-air transmittance at the resolved far distance. |
 | `RECOMP_ATMOSPHERE_OVERRIDE_OUTDOOR` | `outdoorOverride` | `AUTO` | Force the current frame's outdoor classification on or off. |
+| `RECOMP_ATMOSPHERE_OVERRIDE_WATER_INFLUENCE` | `waterInfluence` | Automatic | Replace nearby active water-surface coverage, clamped to 0–1. Zero disables water-derived moisture; rain/storm remains independent. |
 
 For the outdoor override, set the mask bit and use `RECOMP_ATMOSPHERE_OUTDOOR_FORCE_ON` or `RECOMP_ATMOSPHERE_OUTDOOR_FORCE_OFF`. Leaving the bit unset, or selecting `RECOMP_ATMOSPHERE_OUTDOOR_AUTO`, preserves the renderer's automatic classification. This is the intended way to opt a shop, unusual cutscene view, or area without a normal skybox into or out of clear-/wet-air haze.
+
+Automatic classification now leaves a conservative distance haze in skyless world views (15% optical strength, with a minimum 10,000-unit distance scale). Short rooms stay effectively clear. `FORCE_OFF` still suppresses that air contribution completely, and the old conservative-classification F1 switch remains available. Authored MM fog, local effect overrides and secondary-camera eligibility are unchanged.
+
+Water influence estimates nearby water coverage from active scene and dynamic collision water boxes, respecting room scope and disabled owners/boxes as the game does. It varies continuously with surface area inside a 2,000-unit square around the camera and fades with camera-to-water height. It blends toward the existing wet-air transmittance target; it does not change precipitation or MM state. Water missing from collision semantics contributes nothing. Non-overlapping boxes are MM's collision contract; unusually overlapping custom boxes can overestimate coverage, so mods may explicitly override `waterInfluence` when needed. The field is appended after the existing event struct fields, preserving their offsets; old callbacks need no changes.
 
 F1's `Atmosphere` tab shows the current override mask and effective workload values. Masked values take precedence over session-local F1 sliders; unmasked values remain live-tunable.

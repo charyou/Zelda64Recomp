@@ -34,6 +34,61 @@ RECOMP_DECLARE_EVENT(recomp_on_play_update(PlayState* play));
 RECOMP_DECLARE_EVENT(recomp_after_play_update(PlayState* play));
 RECOMP_DECLARE_EVENT(recomp_on_atmosphere_override(PlayState* play, RecompAtmosphereOverride* override));
 
+// Nearby active water surface coverage is a modest humidity proxy, not a scene profile.
+// Match BgCheck_GetWaterSurface's disabled/room/owner rules, including moving water.
+// The bundled decomp predates the WATERBOX_IS_DISABLED / WATERBOX_ROOM_ALL names.
+static float atmosphere_water_box_influence(const WaterBox* box, const Vec3f* eye) {
+    const float radius = 1000.0f;
+    float width;
+    float depth;
+    float heightWeight;
+    if ((box->properties & (1 << 19)) || box->xLength <= 0 || box->zLength <= 0) {
+        return 0.0f;
+    }
+    width = MIN((float)box->minPos.x + box->xLength, eye->x + radius) -
+        MAX((float)box->minPos.x, eye->x - radius);
+    depth = MIN((float)box->minPos.z + box->zLength, eye->z + radius) -
+        MAX((float)box->minPos.z, eye->z - radius);
+    heightWeight = CLAMP(1.0f - fabsf(eye->y - box->minPos.y) / 1000.0f, 0.0f, 1.0f);
+    // Half of the nearby footprint being water reaches the wet-air target. Small
+    // ponds contribute proportionally; distant/deeply submerged views add none.
+    return MAX(width, 0.0f) * MAX(depth, 0.0f) * heightWeight / (2.0f * radius * radius);
+}
+
+static float atmosphere_water_influence(PlayState* play) {
+    CollisionContext* colCtx = &play->colCtx;
+    CollisionHeader* header = colCtx->colHeader;
+    float influence = 0.0f;
+    s32 i;
+    if (header == NULL) {
+        return 0.0f;
+    }
+    if (header->waterBoxes != NULL) {
+        for (i = 0; i < header->numWaterBoxes; i++) {
+            WaterBox* box = &header->waterBoxes[i];
+            s32 room = WATERBOX_ROOM(box->properties);
+            if (room == play->roomCtx.curRoom.num || room == 0x3F) {
+                influence += atmosphere_water_box_influence(box, &play->view.eye);
+            }
+        }
+    }
+    if (colCtx->dyna.waterBoxList.boxes != NULL) {
+        for (i = 0; i < BG_ACTOR_MAX; i++) {
+            BgActor* owner = &colCtx->dyna.bgActors[i];
+            s32 j;
+            if (!(colCtx->dyna.bgActorFlags[i] & BGACTOR_IN_USE) ||
+                (colCtx->dyna.bgActorFlags[i] & BGACTOR_COLLISION_DISABLED) || owner->colHeader == NULL) {
+                continue;
+            }
+            for (j = 0; j < owner->colHeader->numWaterBoxes; j++) {
+                influence += atmosphere_water_box_influence(
+                    &colCtx->dyna.waterBoxList.boxes[owner->waterboxesStartIndex + j], &play->view.eye);
+            }
+        }
+    }
+    return CLAMP(influence, 0.0f, 1.0f);
+}
+
 void controls_play_update(PlayState* play) {
     gSaveContext.options.zTargetSetting = recomp_get_targeting_mode();
 }
@@ -83,6 +138,7 @@ RECOMP_PATCH void Play_Main(GameState* thisx) {
     // Publish Nintendo's fully resolved environment state. RT64 snapshots this
     // as frame metadata; the compatibility renderer does not consume it.
     {
+        const float automaticWaterInfluence = atmosphere_water_influence(this);
         RecompAtmosphereOverride atmosphereOverride = {
             .overrideMask = 0,
             .baseHeightBlend = 0.22f,
@@ -94,6 +150,7 @@ RECOMP_PATCH void Play_Main(GameState* thisx) {
             .clearAirFarTransmittance = 0.90f,
             .wetAirFarTransmittance = 0.65f,
             .outdoorOverride = RECOMP_ATMOSPHERE_OUTDOOR_AUTO,
+            .waterInfluence = automaticWaterInfluence,
         };
         bool conservativeOutdoor = (this->skyboxId != SKYBOX_NONE) && !this->envCtx.skyboxDisabled &&
             (this->roomCtx.curRoom.behaviorType1 == ROOM_BEHAVIOR_TYPE1_0);
@@ -105,6 +162,9 @@ RECOMP_PATCH void Play_Main(GameState* thisx) {
         // Allow mods to supply scene- or room-specific art direction without changing MM's LightContext
         // or the Native/Original renderer. The override is reset every frame to prevent state leakage.
         recomp_on_atmosphere_override(this, &atmosphereOverride);
+        if (!(atmosphereOverride.overrideMask & RECOMP_ATMOSPHERE_OVERRIDE_WATER_INFLUENCE)) {
+            atmosphereOverride.waterInfluence = automaticWaterInfluence;
+        }
         if (atmosphereOverride.overrideMask & RECOMP_ATMOSPHERE_OVERRIDE_OUTDOOR) {
             if (atmosphereOverride.outdoorOverride == RECOMP_ATMOSPHERE_OUTDOOR_FORCE_ON) {
                 expandedOutdoor = true;
@@ -153,6 +213,7 @@ RECOMP_PATCH void Play_Main(GameState* thisx) {
             .saturatedFogHeightBudget = atmosphereOverride.saturatedFogHeightBudget,
             .clearAirFarTransmittance = atmosphereOverride.clearAirFarTransmittance,
             .wetAirFarTransmittance = atmosphereOverride.wetAirFarTransmittance,
+            .waterInfluence = atmosphereOverride.waterInfluence,
         };
         recomp_set_environment_fog(&fog);
     }

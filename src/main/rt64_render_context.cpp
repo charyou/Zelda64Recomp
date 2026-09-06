@@ -2,6 +2,7 @@
 #include <cstring>
 #include <variant>
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <mutex>
 #include <string_view>
@@ -330,6 +331,11 @@ zelda64::renderer::RT64Context::RT64Context(uint8_t* rdram, ultramodern::rendere
     app->userConfig.developerMode = debug;
     const RT64::FogMode initialFogMode = fog_mode_from_environment(to_rt64(cur_config.fog_option));
     app->setFogMode(initialFogMode);
+    const char* lightingOverride = std::getenv("ZELDA64RECOMP_LIGHTING");
+    const bool perPixelLighting = !lightingOverride || std::strcmp(lightingOverride, "original") != 0;
+    app->perPixelLighting.store(perPixelLighting, std::memory_order_relaxed);
+    fprintf(stderr, "RT64 lighting: %s (F1 Lighting tab; ZELDA64RECOMP_LIGHTING=original restores legacy)\n",
+        perPixelLighting ? "Per-pixel" : "Original");
     fprintf(stdout, "RT64 fog mode: %s (Graphics menu; F5 temporarily cycles modes)\n", fog_mode_name(initialFogMode));
     // Force gbi depth branches to prevent LODs from kicking in.
     app->enhancementConfig.f3dex.forceBranch = true;
@@ -427,7 +433,13 @@ void zelda64::renderer::RT64Context::send_dl(const OSTask* task) {
     atmosphere.referenceHeight = environment.reference_height;
     atmosphere.outdoorStrength = environment.outdoor ? 1.0f : 0.0f;
     atmosphere.conservativeOutdoorStrength = atmosphere.outdoorStrength;
-    atmosphere.expandedOutdoorStrength = environment.expanded_outdoor ? 1.0f : 0.0f;
+    // Automatic skyless world views retain a little distance haze. The shader's
+    // far-distance scaling gives at least a 10,000-unit haze length indoors,
+    // so short rooms remain clear even when their authored zFar is small;
+    // authored fog still wins via max optical depth. Explicit mod OFF stays off.
+    const bool outdoorOverride = (environment.atmosphere_override_mask & RT64::AtmosphereOverrideOutdoor) != 0;
+    const float indoorStrength = 0.15f * std::clamp(atmosphere.zFar / 10000.0f, 0.0f, 1.0f);
+    atmosphere.expandedOutdoorStrength = environment.expanded_outdoor ? 1.0f : (outdoorOverride ? 0.0f : indoorStrength);
     atmosphere.overrideMask = environment.atmosphere_override_mask;
     atmosphere.baseHeightBlend = environment.base_height_blend;
     atmosphere.morningHeightBlend = environment.morning_height_blend;
@@ -440,6 +452,12 @@ void zelda64::renderer::RT64Context::send_dl(const OSTask* task) {
     const float rainStrength = std::clamp(environment.rain / 60.0f, 0.0f, 1.0f);
     const float snowStrength = std::clamp(environment.snow / 128.0f, 0.0f, 1.0f) * 0.65f;
     atmosphere.weatherStrength = std::max(rainStrength, snowStrength);
+    // This generic medium parameter describes wet air; precipitation is not its
+    // only source. Missing/custom water semantics retain the dry-air fallback.
+    if (std::isfinite(environment.water_influence)) {
+        atmosphere.weatherStrength = std::max(atmosphere.weatherStrength,
+            std::clamp(environment.water_influence, 0.0f, 1.0f));
+    }
     if (environment.storm) {
         atmosphere.weatherStrength = std::max(atmosphere.weatherStrength, 0.75f);
     }

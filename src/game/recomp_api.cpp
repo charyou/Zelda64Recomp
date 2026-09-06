@@ -14,8 +14,8 @@
 #include "ultramodern/ultramodern.hpp"
 #include "ultramodern/config.hpp"
 
-static_assert(sizeof(RecompAtmosphereOverride) == (10 * sizeof(uint32_t)));
-static_assert(sizeof(RecompEnvironmentFog) == (28 * sizeof(uint32_t)));
+static_assert(sizeof(RecompAtmosphereOverride) == (11 * sizeof(uint32_t)));
+static_assert(sizeof(RecompEnvironmentFog) == (29 * sizeof(uint32_t)));
 
 extern "C" void recomp_update_inputs(uint8_t* rdram, recomp_context* ctx) {
     recomp::poll_inputs();
@@ -226,5 +226,6 @@ extern "C" void recomp_set_environment_fog(uint8_t* rdram, recomp_context* ctx) 
         .saturated_fog_height_budget = read_float(25),
         .clear_air_far_transmittance = read_float(26),
         .wet_air_far_transmittance = read_float(27),
+        .water_influence = read_float(28),
     });
 }

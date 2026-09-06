@@ -39,6 +39,7 @@ typedef struct RecompEnvironmentFog {
     float saturatedFogHeightBudget;
     float clearAirFarTransmittance;
     float wetAirFarTransmittance;
+    float waterInfluence;
 } RecompEnvironmentFog;
 
 DECLARE_FUNC(void, recomp_set_environment_fog, RecompEnvironmentFog* fog);

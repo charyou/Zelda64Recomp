@@ -19,6 +19,7 @@ typedef enum RecompAtmosphereOverrideField {
     RECOMP_ATMOSPHERE_OVERRIDE_CLEAR_AIR_TRANSMITTANCE = (1 << 6),
     RECOMP_ATMOSPHERE_OVERRIDE_WET_AIR_TRANSMITTANCE = (1 << 7),
     RECOMP_ATMOSPHERE_OVERRIDE_OUTDOOR = (1 << 8),
+    RECOMP_ATMOSPHERE_OVERRIDE_WATER_INFLUENCE = (1 << 9),
 } RecompAtmosphereOverrideField;
 
 typedef enum RecompAtmosphereOutdoorOverride {
@@ -40,6 +41,9 @@ typedef struct RecompAtmosphereOverride {
     float clearAirFarTransmittance;
     float wetAirFarTransmittance;
     Z64RECOMP_ATMOSPHERE_U32 outdoorOverride;
+    // Appended extension: nearby active water coverage, [0, 1]. Set the mask to
+    // replace this automatic signal (including zero for unsupported/custom water).
+    float waterInfluence;
 } RecompAtmosphereOverride;
 
 #undef Z64RECOMP_ATMOSPHERE_U32

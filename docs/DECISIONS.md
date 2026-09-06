@@ -24,7 +24,7 @@
 
 **Context:** Atmospheric rendering needs resolved MM environment state that is lost when `Play_SetFog` quantizes it to RSP coefficients.
 
-**Decision:** Zelda64Recomp extracts resolved `LightContext` fog color, fogNear, and zFar plus the resolved environment sun vector, active world-camera state, conservative outdoor classification, current precipitation, and storm state, then passes them through the native renderer adapter. RT64 snapshots the generic atmosphere structure onto the Workload before display-list processing.
+**Decision:** Zelda64Recomp extracts resolved `LightContext` fog color, fogNear, and zFar plus the resolved environment sun vector, active world-camera state, conservative outdoor classification, current precipitation, storm state, and nearby active collision-water coverage, then passes them through the native renderer adapter. RT64 snapshots the generic atmosphere structure onto the Workload before display-list processing. Water coverage contributes to the generic wet-air influence; automatic skyless views receive conservative distance attenuation. Explicit mod overrides retain priority.
 
 **Why:** A Workload is the stable per-frame render record and avoids render-thread/HFR races. MM logic remains in the game integration layer; RT64 receives only generic resolved inputs.
 
@@ -38,7 +38,7 @@
 
 **Context:** MM frequently overrides fog for actors and effects, then restores `Play_SetFog`. Applying one atmosphere model to every fogged draw would erase those local choices or double-fog them.
 
-**Decision:** Compare each draw's final RSP fog coefficients and fog RGB with the signature derived from the resolved environment state. Atmospheric eligibility additionally requires a perspective projection whose inferred camera position and orientation match MM's active world camera. Matching world draws may use Atmospheric fog, with a semantically and optically headroom-gated share of the authored optical depth redistributed into a height-dependent medium rather than stacked as a second fog curve. Conservatively classified outdoor views may also use a clear-/wet-air transmittance floor combined by maximum optical depth, never addition. Nonmatching local/effect and secondary-camera/UI draws use Faithful Per-Pixel fog; mixed per-vertex-state draws use Original.
+**Decision:** Compare each draw's final RSP fog coefficients and fog RGB with the signature derived from the resolved environment state. Atmospheric eligibility additionally requires a perspective projection whose inferred camera position and orientation match MM's active world camera. Matching world draws may use Atmospheric fog, with a semantically and optically headroom-gated share of the authored optical depth redistributed into a height-dependent medium rather than stacked as a second fog curve. Classified outdoor views may also use a clear-/wet-air transmittance floor combined by maximum optical depth, never addition. Automatic skyless views use a conservative distance-attenuated floor; explicit mod OFF remains zero. Nonmatching local/effect and secondary-camera/UI draws use Faithful Per-Pixel fog; mixed per-vertex-state draws use Original.
 
 **Why:** It preserves per-draw authoring and existing N64 blender semantics without requiring MM-specific scene profiles inside RT64.
 
@@ -85,3 +85,15 @@
 **Why:** Source inspection identifies two incompatible downstream assumptions. Model decomposition normalizes by matrix `[3][3]` without retaining the homogeneous factor; baking projection into model transforms introduces near-zero or negative factors and changes model-space lighting/interpolation inputs. Separately, enhanced projection processing recomposes `inverse(EV) * V * inverse(EP) * P`, which generally differs from the exact full correction `inverse(EV * EP) * (V * P)`. Disabling interpolation alone cannot guarantee neutral output.
 
 **Consequences:** Future camera precision work must preserve affine model/world transforms, preserve Native/RDRAM inputs, carry camera precision through an explicit camera/projection representation, and account for secondary views, state lifetime, and MM's resolved `View_StepDistortion`. Generic Extended GBI support remains available; it is not assumed to be a drop-in camera replacement. Qualification must include ordinary play, modded content, skyboxes, pause/UI cameras, cutscenes, distortion, lighting, and high frame rates before enabling a replacement.
+
+## ADR-007 — Per-pixel diffuse lighting reuses actual RSP semantics
+
+**Status:** Accepted for the first enhanced implementation
+
+**Context:** RT64 already retains authored normals, ambient/directional lights, per-vertex lighting state and interpolated world transforms. Reconstructing MM lighting in a second semantic system is unnecessary to improve coarse vertex-lit characters.
+
+**Decision:** Evaluate those existing lights per pixel on eligible enhanced draws. Gate by a uniform per-vertex light set, usable normals and compatible affine transforms. Transform each vertex normal into a shared lighting space, allowing different skeleton limb matrices within one draw; retain legacy for nonuniform scale/shear/projective transforms. Carry normals through the existing smooth RGB interpolant only when both stages select the enhanced path. Preserve original vertex lighting in Native and on all unsupported draws, including actual positional microcode lights and modified colors. No Zelda identities or assumptions about vanilla meshes belong in this renderer feature.
+
+**Why:** This gives a contained diffuse-shading improvement while preserving the lights chosen by the game and its mods, shader output linkage, draw-local alpha/fog and existing combiner/blender behavior. HFR uses the renderer's already interpolated matrices.
+
+**Consequences:** Lighting is independently selectable from fog. Future positional lighting or shadows must preserve the current fallback rather than silently dropping unsupported lights. New vertex system inputs and RDP layout changes still require synchronized shader builds and runtime API checks. See `docs/PER_PIXEL_LIGHTING.md` for eligibility and integration details.
