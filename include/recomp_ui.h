@@ -56,6 +56,7 @@ namespace recompui {
     ContextId try_close_current_context();
 
     ContextId get_launcher_context_id();
+    void try_developer_autostart();
     ContextId get_config_context_id();
     ContextId get_config_sub_menu_context_id();
 

@@ -32,6 +32,10 @@ namespace {
             return fallback;
         }
 
+        if (std::string_view(mode) == "original") {
+            return RT64::FogMode::Original;
+        }
+
         if (std::string_view(mode) == "faithful") {
             return RT64::FogMode::FaithfulPerPixel;
         }
@@ -360,6 +364,29 @@ zelda64::renderer::RT64Context::RT64Context(uint8_t* rdram, ultramodern::rendere
         return;
     }
 
+    // Same presentation switch as F3, available without OS keyboard injection.
+    // A new application starts with viewRDRAM=false; apply this once after setup.
+    if (const char* native = std::getenv("ZELDA64RECOMP_DEV_NATIVE")) {
+        const bool use_native = std::strcmp(native, "1") == 0;
+        if (use_native) {
+            app->processDeveloperShortcut(RT64::Application::DeveloperShortcut::ViewRDRAM);
+        }
+        else {
+            fprintf(stderr, "[Dev render] Rejected ZELDA64RECOMP_DEV_NATIVE: expected 1; retaining enhanced presentation.\n");
+        }
+        const char* api_name = "Unknown";
+        switch (chosen_api) {
+        case ultramodern::renderer::GraphicsApi::D3D12: api_name = "D3D12"; break;
+        case ultramodern::renderer::GraphicsApi::Vulkan: api_name = "Vulkan"; break;
+        case ultramodern::renderer::GraphicsApi::Metal: api_name = "Metal"; break;
+        case ultramodern::renderer::GraphicsApi::Auto: api_name = "Auto"; break;
+        default: break;
+        }
+        fprintf(stderr, "[Dev render] API=%s; configured fog=%s; presentation=%s.\n",
+            api_name, fog_mode_name(initialFogMode), use_native ? "Native/RDRAM" : "Enhanced");
+        fflush(stderr);
+    }
+
     // Set the application's fullscreen state.
     app->setFullScreen(cur_config.wm_option == ultramodern::renderer::WindowMode::Fullscreen);
 
@@ -399,6 +426,17 @@ void zelda64::renderer::RT64Context::send_dl(const OSTask* task) {
     atmosphere.viewDirection = hlslpp::float3(environment.view_x, environment.view_y, environment.view_z);
     atmosphere.referenceHeight = environment.reference_height;
     atmosphere.outdoorStrength = environment.outdoor ? 1.0f : 0.0f;
+    atmosphere.conservativeOutdoorStrength = atmosphere.outdoorStrength;
+    atmosphere.expandedOutdoorStrength = environment.expanded_outdoor ? 1.0f : 0.0f;
+    atmosphere.overrideMask = environment.atmosphere_override_mask;
+    atmosphere.baseHeightBlend = environment.base_height_blend;
+    atmosphere.morningHeightBlend = environment.morning_height_blend;
+    atmosphere.scaleHeightFraction = environment.scale_height_fraction;
+    atmosphere.densityVariation = environment.density_variation;
+    atmosphere.directionalScattering = environment.directional_scattering;
+    atmosphere.saturatedFogHeightBudget = environment.saturated_fog_height_budget;
+    atmosphere.clearAirFarTransmittance = environment.clear_air_far_transmittance;
+    atmosphere.wetAirFarTransmittance = environment.wet_air_far_transmittance;
     const float rainStrength = std::clamp(environment.rain / 60.0f, 0.0f, 1.0f);
     const float snowStrength = std::clamp(environment.snow / 128.0f, 0.0f, 1.0f) * 0.65f;
     atmosphere.weatherStrength = std::max(rainStrength, snowStrength);

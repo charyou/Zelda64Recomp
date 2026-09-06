@@ -6,6 +6,9 @@
 #include "RmlUi/Core.h"
 #include "nfd.h"
 #include <filesystem>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 static std::string version_string;
 
@@ -13,6 +16,31 @@ Rml::DataModelHandle model_handle;
 bool mm_rom_valid = false;
 
 extern std::vector<recomp::GameEntry> supported_games;
+
+// Called from the first initialized UI draw, after stored-ROM validation.
+void recompui::try_developer_autostart() {
+    static bool attempted = false;
+    if (attempted) {
+        return;
+    }
+    attempted = true;
+    const char* value = std::getenv("ZELDA64RECOMP_DEV_AUTOSTART");
+    if (value == nullptr || value[0] == '\0') {
+        return;
+    }
+    if (std::strcmp(value, "1") != 0) {
+        fprintf(stderr, "[Dev start] Rejected ZELDA64RECOMP_DEV_AUTOSTART: expected 1.\n");
+    }
+    else if (supported_games.empty() || !recomp::is_rom_valid(supported_games[0].game_id)) {
+        fprintf(stderr, "[Dev start] Configured ROM is unavailable; leaving launcher open.\n");
+    }
+    else if (!ultramodern::is_game_started()) {
+        recomp::start_game(supported_games[0].game_id);
+        recompui::hide_all_contexts();
+        fprintf(stderr, "[Dev start] Started configured game.\n");
+    }
+    fflush(stderr);
+}
 
 void select_rom() {
     nfdnchar_t* native_path = nullptr;

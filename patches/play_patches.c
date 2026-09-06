@@ -32,6 +32,7 @@ extern Input D_801F6C18;
 RECOMP_DECLARE_EVENT(recomp_on_play_main(PlayState* play));
 RECOMP_DECLARE_EVENT(recomp_on_play_update(PlayState* play));
 RECOMP_DECLARE_EVENT(recomp_after_play_update(PlayState* play));
+RECOMP_DECLARE_EVENT(recomp_on_atmosphere_override(PlayState* play, RecompAtmosphereOverride* override));
 
 void controls_play_update(PlayState* play) {
     gSaveContext.options.zTargetSetting = recomp_get_targeting_mode();
@@ -82,6 +83,41 @@ RECOMP_PATCH void Play_Main(GameState* thisx) {
     // Publish Nintendo's fully resolved environment state. RT64 snapshots this
     // as frame metadata; the compatibility renderer does not consume it.
     {
+        RecompAtmosphereOverride atmosphereOverride = {
+            .overrideMask = 0,
+            .baseHeightBlend = 0.22f,
+            .morningHeightBlend = 0.69f,
+            .scaleHeightFraction = 0.015f,
+            .densityVariation = 0.12f,
+            .directionalScattering = 0.25f,
+            .saturatedFogHeightBudget = 0.03f,
+            .clearAirFarTransmittance = 0.90f,
+            .wetAirFarTransmittance = 0.65f,
+            .outdoorOverride = RECOMP_ATMOSPHERE_OUTDOOR_AUTO,
+        };
+        bool conservativeOutdoor = (this->skyboxId != SKYBOX_NONE) && !this->envCtx.skyboxDisabled &&
+            (this->roomCtx.curRoom.behaviorType1 == ROOM_BEHAVIOR_TYPE1_0);
+        const bool naturalSky = (this->skyboxId == SKYBOX_NORMAL_SKY) || (this->skyboxId == SKYBOX_3);
+        bool expandedOutdoor = naturalSky &&
+            (this->roomCtx.curRoom.behaviorType1 == ROOM_BEHAVIOR_TYPE1_0);
+
+        // @recomp_event recomp_on_atmosphere_override(PlayState* play, RecompAtmosphereOverride* override):
+        // Allow mods to supply scene- or room-specific art direction without changing MM's LightContext
+        // or the Native/Original renderer. The override is reset every frame to prevent state leakage.
+        recomp_on_atmosphere_override(this, &atmosphereOverride);
+        if (atmosphereOverride.overrideMask & RECOMP_ATMOSPHERE_OVERRIDE_OUTDOOR) {
+            if (atmosphereOverride.outdoorOverride == RECOMP_ATMOSPHERE_OUTDOOR_FORCE_ON) {
+                expandedOutdoor = true;
+                conservativeOutdoor = true;
+            } else if (atmosphereOverride.outdoorOverride == RECOMP_ATMOSPHERE_OUTDOOR_FORCE_OFF) {
+                expandedOutdoor = false;
+                conservativeOutdoor = false;
+            } else {
+                // AUTO with the bit set remains automatic rather than unexpectedly forcing indoor.
+                atmosphereOverride.overrideMask &= ~RECOMP_ATMOSPHERE_OVERRIDE_OUTDOOR;
+            }
+        }
+
         RecompEnvironmentFog fog = {
             .valid = true,
             .rgb = ((u32)this->lightCtx.fogColor[0] << 16) |
@@ -97,18 +133,27 @@ RECOMP_PATCH void Play_Main(GameState* thisx) {
             .cameraZ = this->view.eye.z,
             // guLookAt stores the camera's backward (+Z) basis, matching RT64's inverse-view row 2.
             .viewX = this->view.eye.x - this->view.at.x,
-              .viewY = this->view.eye.y - this->view.at.y,
-              .viewZ = this->view.eye.z - this->view.at.z,
-              .referenceHeight = this->view.at.y,
-              // A visible scene sky in a normal room is a conservative, scene-ID-independent
-              // indication that clear-air atmosphere may be applied to the world camera.
-              .outdoor = (this->skyboxId != SKYBOX_NONE) && !this->envCtx.skyboxDisabled &&
-                  (this->roomCtx.curRoom.behaviorType1 == ROOM_BEHAVIOR_TYPE1_0),
-              .rain = this->envCtx.precipitation[PRECIP_RAIN_CUR],
-              .snow = this->envCtx.precipitation[PRECIP_SNOW_CUR],
-              .storm = (this->envCtx.stormState == STORM_STATE_ON) ||
-                  (this->envCtx.lightningState != LIGHTNING_OFF),
-          };
+            .viewY = this->view.eye.y - this->view.at.y,
+            .viewZ = this->view.eye.z - this->view.at.z,
+            .referenceHeight = this->view.at.y,
+            // Keep the old visible-sky test for A/B comparison. The expanded signal treats a
+            // natural sky as outdoor even when a cutscene temporarily disables its drawing.
+            .outdoor = conservativeOutdoor,
+            .rain = this->envCtx.precipitation[PRECIP_RAIN_CUR],
+            .snow = this->envCtx.precipitation[PRECIP_SNOW_CUR],
+            .storm = (this->envCtx.stormState == STORM_STATE_ON) ||
+                (this->envCtx.lightningState != LIGHTNING_OFF),
+            .expandedOutdoor = expandedOutdoor,
+            .atmosphereOverrideMask = atmosphereOverride.overrideMask,
+            .baseHeightBlend = atmosphereOverride.baseHeightBlend,
+            .morningHeightBlend = atmosphereOverride.morningHeightBlend,
+            .scaleHeightFraction = atmosphereOverride.scaleHeightFraction,
+            .densityVariation = atmosphereOverride.densityVariation,
+            .directionalScattering = atmosphereOverride.directionalScattering,
+            .saturatedFogHeightBudget = atmosphereOverride.saturatedFogHeightBudget,
+            .clearAirFarTransmittance = atmosphereOverride.clearAirFarTransmittance,
+            .wetAirFarTransmittance = atmosphereOverride.wetAirFarTransmittance,
+        };
         recomp_set_environment_fog(&fog);
     }
 

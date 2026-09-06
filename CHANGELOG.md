@@ -16,5 +16,7 @@
 
 ### Fixed
 
+- Fixed radial geometry corruption by removing the experimental camera-matrix publication path.
+- Fixed incremental builds retaining stale shaders or patch registration metadata, including the resulting code-mod loading error.
 - Fixed severe flickering and color and geometry corruption on AMD Radeon RX 9000-series GPUs caused by the initial modern-fog raster shader linkage.
 - Added automatic Vulkan selection for affected AMD RDNA4 GPUs to avoid a known Direct3D 12 startup crash.

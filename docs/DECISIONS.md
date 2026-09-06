@@ -59,3 +59,29 @@
 **Alternatives considered:** Keeping the extra varying; disabling modern fog on RDNA4; adding a separate shader permutation. The first is demonstrably broken on current hardware, the second loses the feature, and the third increases shader-cache and linkage complexity unnecessarily.
 
 **Consequences:** Future raster enhancements should prefer values already available from system semantics or existing interpolants. Any new cross-stage varying requires in-game validation on both Vulkan and D3D12, including AMD hardware, before acceptance.
+
+## ADR-005 — Atmospheric art direction is a masked per-frame mod event
+
+**Status:** Accepted for the experimental Atmospheric mode
+
+**Context:** A global preset cannot cover deliberately stronger regions such as Southern Swamp, unusual rooms, or cutscenes whose skybox is temporarily hidden. Scene tables and room IDs are Majora-specific and do not belong in generic RT64 code.
+
+**Decision:** Zelda64Recomp publishes `recomp_on_atmosphere_override` once per gameplay frame with initialized defaults and an explicit field mask. Code mods may select scenes, rooms, cutscene state, time, or weather through `PlayState` and override only the atmospheric fields they own. Overrides are copied into Workload metadata and affect only enhanced Atmospheric replay. A separate automatic signal classifies natural-sky normal rooms as outdoor even when the skybox draw is disabled; F1 can A/B this expansion, while a masked mod value takes precedence.
+
+**Why:** Per-frame masked ownership prevents state leakage, permits small composable area profiles, and keeps MM policy out of RT64. It also retains conservative defaults for genuinely indoor shops while allowing explicit art direction where useful.
+
+**Consequences:** The event ABI and public struct layout must remain versioned compatibly once released. Multiple mods claiming the same field resolve by normal callback order. Original/Native and MM's `LightContext` must never consume these values.
+
+## ADR-006 — Withdraw camera-basis publication; preserve affine model transforms
+
+**Status:** Original experiment withdrawn; replacement boundary accepted
+
+**Context:** The experiment published MM's main camera through `gEXSetViewMatrixFloat` and `gEXSetProjMatrixFloat` while preserving the fixed display-list commands. Default-off switches substituted fixed camera matrices into those Extended GBI commands. This still changed RT64's extended coordinate basis: `RSP::setVertexCommon` multiplied that camera view-projection into every model/world transform. The assumption that publication was neutral with both switches off was false.
+
+**Decision:** Remove Zelda's added `View_ApplyPerspective` patch, parallel float generation, unconditional camera-basis publication, and precision switches. The existing camera interpolation tags continue to use MM's original fixed perspective/distortion/view path. Restore RT64's upstream float-command handlers so mods retain the documented generic commands without fork-wide overrides. Keep exact fixed RSP camera references for semantic fog classification, aligned with the other projection arrays including their identity sentinel.
+
+**Evidence:** A fresh shader build with the semantic-camera sentinel correction still produced radial geometry wedges at the Southern Swamp owl. Omitting only the four camera-publication commands, with synchronized patch metadata, restored a clean view at the same checkpoint and mod profile. This establishes publication as causal for that reproduced failure; it does not qualify every scene or individually attribute the failure to one downstream matrix operation.
+
+**Why:** Source inspection identifies two incompatible downstream assumptions. Model decomposition normalizes by matrix `[3][3]` without retaining the homogeneous factor; baking projection into model transforms introduces near-zero or negative factors and changes model-space lighting/interpolation inputs. Separately, enhanced projection processing recomposes `inverse(EV) * V * inverse(EP) * P`, which generally differs from the exact full correction `inverse(EV * EP) * (V * P)`. Disabling interpolation alone cannot guarantee neutral output.
+
+**Consequences:** Future camera precision work must preserve affine model/world transforms, preserve Native/RDRAM inputs, carry camera precision through an explicit camera/projection representation, and account for secondary views, state lifetime, and MM's resolved `View_StepDistortion`. Generic Extended GBI support remains available; it is not assumed to be a drop-in camera replacement. Qualification must include ordinary play, modded content, skyboxes, pause/UI cameras, cutscenes, distortion, lighting, and high frame rates before enabling a replacement.

@@ -14,6 +14,9 @@
 #include "ultramodern/ultramodern.hpp"
 #include "ultramodern/config.hpp"
 
+static_assert(sizeof(RecompAtmosphereOverride) == (10 * sizeof(uint32_t)));
+static_assert(sizeof(RecompEnvironmentFog) == (28 * sizeof(uint32_t)));
+
 extern "C" void recomp_update_inputs(uint8_t* rdram, recomp_context* ctx) {
     recomp::poll_inputs();
 }
@@ -206,12 +209,22 @@ extern "C" void recomp_set_environment_fog(uint8_t* rdram, recomp_context* ctx) 
         .camera_y = read_float(8),
         .camera_z = read_float(9),
         .view_x = read_float(10),
-          .view_y = read_float(11),
-          .view_z = read_float(12),
-          .reference_height = read_float(13),
-          .outdoor = MEM_W(14 * sizeof(u32), fog) != 0,
-          .rain = static_cast<uint8_t>(MEM_W(15 * sizeof(u32), fog)),
-          .snow = static_cast<uint8_t>(MEM_W(16 * sizeof(u32), fog)),
-          .storm = MEM_W(17 * sizeof(u32), fog) != 0,
-      });
-  }
+        .view_y = read_float(11),
+        .view_z = read_float(12),
+        .reference_height = read_float(13),
+        .outdoor = MEM_W(14 * sizeof(u32), fog) != 0,
+        .expanded_outdoor = MEM_W(18 * sizeof(u32), fog) != 0,
+        .rain = static_cast<uint8_t>(MEM_W(15 * sizeof(u32), fog)),
+        .snow = static_cast<uint8_t>(MEM_W(16 * sizeof(u32), fog)),
+        .storm = MEM_W(17 * sizeof(u32), fog) != 0,
+        .atmosphere_override_mask = MEM_W(19 * sizeof(u32), fog),
+        .base_height_blend = read_float(20),
+        .morning_height_blend = read_float(21),
+        .scale_height_fraction = read_float(22),
+        .density_variation = read_float(23),
+        .directional_scattering = read_float(24),
+        .saturated_fog_height_budget = read_float(25),
+        .clear_air_far_transmittance = read_float(26),
+        .wet_air_far_transmittance = read_float(27),
+    });
+}

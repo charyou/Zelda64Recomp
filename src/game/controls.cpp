@@ -1,4 +1,6 @@
 #include <array>
+#include <cstdlib>
+#include "developer_input.h"
 
 #include "librecomp/helpers.hpp"
 #include "recomp_input.h"
@@ -82,6 +84,12 @@ bool recomp::get_n64_input(int controller_num, uint16_t* buttons_out, float* x_o
     
     if (controller_num != 0) {
         return false;
+    }
+
+    // Loaded once on the first game controller read, only with explicit opt-in.
+    static zelda64::DeveloperInputPlayback developer_input(std::getenv("ZELDA64RECOMP_DEV_INPUT"));
+    if (developer_input.read(buttons_out, x_out, y_out)) {
+        return true;
     }
 
     if (!recomp::game_input_disabled()) {

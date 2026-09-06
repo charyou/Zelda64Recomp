@@ -129,7 +129,8 @@ add_custom_target(PatchesBin
 # Generate patches_bin.c from patches.bin
 add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/RecompiledPatches/patches_bin.c
     COMMAND file_to_c ${CMAKE_SOURCE_DIR}/patches/patches.bin mm_patches_bin ${CMAKE_SOURCE_DIR}/RecompiledPatches/patches_bin.c ${CMAKE_SOURCE_DIR}/RecompiledPatches/patches_bin.h
-    DEPENDS ${CMAKE_SOURCE_DIR}/patches/patches.bin
+    DEPENDS ${CMAKE_SOURCE_DIR}/patches/patches.bin file_to_c
+    BYPRODUCTS ${CMAKE_SOURCE_DIR}/RecompiledPatches/patches_bin.h
 )
 
 # Recompile patches elf into patches.c and patches.bin
@@ -138,10 +139,24 @@ add_custom_command(OUTPUT
                        ${CMAKE_SOURCE_DIR}/RecompiledPatches/patches.c
                        ${CMAKE_SOURCE_DIR}/RecompiledPatches/recomp_overlays.inl
                        ${CMAKE_SOURCE_DIR}/RecompiledPatches/funcs.h
-                   # TODO: Look into why modifying patches requires two builds to take
                    COMMAND ./N64Recomp patches.toml
                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
                    DEPENDS ${CMAKE_SOURCE_DIR}/patches/patches.elf
+                           ${CMAKE_SOURCE_DIR}/N64Recomp${CMAKE_EXECUTABLE_SUFFIX}
+                           ${CMAKE_SOURCE_DIR}/patches.toml
+                           ${CMAKE_SOURCE_DIR}/patches/custom_syms.toml
+                           ${CMAKE_SOURCE_DIR}/Zelda64RecompSyms/mm.us.rev1.syms.toml
+                           ${CMAKE_SOURCE_DIR}/Zelda64RecompSyms/mm.us.rev1.datasyms.toml
+                           ${CMAKE_SOURCE_DIR}/Zelda64RecompSyms/mm.us.rev1.datasyms_static.toml
+)
+
+# Compiler-discovered relative includes can be distinct Ninja nodes from the
+# absolute generator outputs. Keep the registration table and binary size in
+# the same build cohort as PatchesLib, including the first incremental build.
+set_property(SOURCE ${CMAKE_SOURCE_DIR}/src/main/register_patches.cpp APPEND PROPERTY OBJECT_DEPENDS
+    ${CMAKE_SOURCE_DIR}/RecompiledPatches/patches_bin.h
+    ${CMAKE_SOURCE_DIR}/RecompiledPatches/recomp_overlays.inl
+    ${CMAKE_SOURCE_DIR}/RecompiledPatches/funcs.h
 )
 
 # Main executable

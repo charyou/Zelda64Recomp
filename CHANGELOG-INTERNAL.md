@@ -4,6 +4,64 @@
 > Einträge, die älter als 3–4 Sessions sind, werden zu Kurzfassungen kompaktiert.
 > Details stehen dann nur noch in der Git-History beziehungsweise den verlinkten Projektdokumenten.
 
+## 2026-09-06 — Geometry recovery and a working visual validation loop
+
+- Reproduced radial wedges directly through native window capture, first in the bad oracle and then in a fresh current-source control. The copied modded Southern Swamp owl save remained broken with fresh shaders and corrected atmosphere-camera indices; omitting the four camera-publication EGBI commands restored clean geometry. Native/RDRAM also rendered the checkpoint correctly.
+- Withdrew the entire float-camera perspective patch and precision switches; restored generic RT64 float commands for mods. ADR-006 now records the affine model/world constraint and limited causal A/B evidence. Original MM camera/distortion behavior and existing interpolation tags remain.
+- Fixed two independently reproduced build defects. RT64 shaders lacked transitive include dependencies (historical vertex shaders had 176-byte RDP layouts, current CPU/shaders 320). Root patch generation could leave old registration tables linked with new patch code, reproducing the blank-name code-mod error. DXC depfiles and explicit generated-header dependencies now rebuild the correct consumers in one invocation.
+- Fixed missing index-zero identity sentinels in the semantic camera arrays. Added assertions for projection-index alignment.
+- Added opt-in autostart, finite controller-read playback and Native startup selection, plus isolated-profile preparation/hashes/free-space checks. Mouse/window capture works through native Computer Use on the interactive desktop; key injection is unreliable. A nine-step sequence now loads the copied file-1 save; an extended sequence reaches pause. No broad automation framework or save-state system was introduced.
+- Full Clang/LLD build passed. Targeted dependency tests verified selective rebuilds and no-op behavior; playback/profile checks passed. Final executable SHA-256 is `D6F7628E560797A20FCCF25FAA8CBF7F8B8244FF360215B8393527B0BEB46E51`. Final Atmospheric pause inventory is clean; scene/mode results and remaining coverage are recorded in the regression document.
+- Final smoke checks also passed enhanced Original and Faithful at the owl and the same save without external mod archives. The copied mod profile/seed was restored afterward. Both historical oracles are intact. Tested seed contains 47 mod archives / 46 enabled entries, not proven coverage of the user's full installation. A second large profile copy exhausted disk; only its incomplete output was removed. Broad fog/effect qualification remains pending.
+- Evidence: `_working-directory/diagnostics/2026-09-06/`; durable workflow: `docs/RUNTIME_VALIDATION.md`; current build and next step: `HANDOFF.md`. Work remains uncommitted alongside prior fog changes.
+
+## 2026-09-06 — Enhanced-Geometrieregression und neutrale Übergabe
+
+### Befund
+
+- Der Benutzer bestätigte im 22:15-Build große schwarze beziehungsweise grüne Dreiecke, die ungefähr radial aus der Bildschirmmitte laufen und sowohl Szenengeometrie als auch Skybox betreffen. F3/Native rendert denselben Zustand korrekt. `Refresh Rate Mode = Original` brachte keine Besserung.
+- Der erhaltene Build vom 2026-09-02 16:19 läuft mit derselben praktischen großen Mod-Installation fehlerfrei. Damit ist die frühere Zuschreibung explodierender Geometrie an den gleichzeitig aktiven Mod-Gesamtstack allein nicht haltbar. Mod-Reihenfolge und Config-Root bleiben mögliche Interaktionsvariablen, aber die Executable-/Patch-/RT64-Differenz ist der zentrale Untersuchungsraum.
+- Der gute Build wurde mit SHA-256 `F9F3CD...DFD3B1D`, der fehlerhafte mit `7529CC...EFDB0D` gesichert. `RecompiledFuncs.lib` ist byte-identisch; `PatchesLib.lib` und `rt64.lib` unterscheiden sich. ROM, geprüfte Modarchive, Runtime-DLLs und die zuvor verglichenen Shaderartefakte waren identisch.
+- `Refresh Rate Mode` ist als alleinige Ursache ausgeschlossen. Ein Vanilla-Lauf steht noch aus.
+
+### Config- und UI-Korrektur
+
+- Der zuvor empfohlene F1-Test für Float View/Projection ist im Rasterbuild nicht erreichbar: Der gesamte `Game`-Tab liegt in RT64 innerhalb von `#if RT_ENABLED`. Beide Atomics sind session-lokal und standardmäßig `false`; eine alte `graphics.json` erklärt den fehlenden Tab nicht.
+- Standardmäßig ausgeschaltete Atomics bilden trotzdem keinen echten Altpfad, weil der gepatchte `View_ApplyPerspective` die vier Float-Matrix-EGBI-Kommandos für OPA/XLU stets emittiert. Ein belastbarer A/B-Build muss diese Veröffentlichung beziehungsweise den gesamten Patchpfad umgehen.
+
+### Übergabe und nächster Entscheid
+
+- `docs/GRAPHICS_REGRESSION_HANDOFF.md` enthält die vollständige, bewusst ergebnisoffene Übergabe: Build-Hashes, bestätigte Ausschlüsse, Zeit-/Source-Grenzen, offene Hypothesen, A/B-Kandidaten und einen automatisierbaren Human-in-the-loop-Screenshotplan.
+- Es wurde noch nicht entschieden, ob der aktuelle Stand gezielt repariert, in Source-Kohorten bisektiert oder von einem rekonstruierten guten Zustand neu aufgebaut wird. Der gute 16:19-Build ist ein binärer Oracle, aber keinem sicher reproduzierbaren Commit zugeordnet; ein unmittelbarer Rücksprung auf `f5cac21` wäre daher keine verlässliche Wiederherstellung.
+- Bis zur Behebung und erneuten Fog-Qualifizierung beginnt kein Per-Pixel-Lighting- oder weiterer Renderer-Upgrade-Schritt.
+
+## 2026-09-02 — Fog-Mod-API, Coverage-Diagnostik und Float-Kamera-A/B
+
+### Ergebnisse
+
+- Atmospheric stellt Code-Mods jetzt pro Gameplay-Frame das Event `recomp_on_atmosphere_override` bereit. Ein Bitmasken-Struct erlaubt unabhängige Overrides der acht Atmosphärenparameter und der Outdoor-Klassifikation; nicht beanspruchte Felder bleiben bei Renderer-/F1-Werten und der Zustand wird pro Frame neu initialisiert.
+- Die öffentliche C-Definition liegt in `include/z64recomp_atmosphere_api.h`; `docs/MODERN_FOG_MODDING.md` dokumentiert scene-/room-spezifische Callbacks am Swamp-Beispiel. Maskierte Mod-Werte haben Vorrang vor Live-Reglern.
+- Die automatische Outdoor-Erkennung besitzt nun eine separat über F1 schaltbare erweiterte Variante: normale Räume mit natürlichem `SKYBOX_NORMAL_SKY`/`SKYBOX_3` bleiben auch bei durch Cutscenes deaktiviertem Skybox-Draw outdoor. Der alte sichtbare-Skybox-Test läuft parallel für A/B; echte skyboxlose Shops bleiben konservativ.
+- Der F1-Atmosphere-Tab zählt Atmospheric-Draws und den jeweils ersten Fallback-Grund (Viewport, Fog-State, Tiefe, Projektion, Kamera oder Fog-Signatur). Damit lassen sich fehlende Clock-Town-/Cutscene-Bereiche diagnostizieren, bevor Sicherheitsgrenzen gelockert werden.
+- Der normale MM-Perspective-View-Pfad veröffentlicht parallel zur unveränderten Fixed-Matrix eine `guLookAtF`-View und eine `guPerspectiveF`-Projection. Die Float-Projection erhält nach einmaligem `View_StepDistortion` dieselbe endgültig aufgelöste Rotations-/Skalentransformation.
+- RT64 kann Float View und Float Projection im F1-Game-Tab unabhängig auswählen; beide A/B-Schalter sind session-lokal und bis zur Sichtprüfung standardmäßig aus. Bei ausgeschaltetem Schalter wird explizit die bestehende Fixed-Matrix weiterverwendet.
+- Workloads behalten zusätzlich die echten finalen Fixed-RSP-View-/ViewProjection-Matrizen. Fog-Kameraerkennung und World-Reconstruction verwenden diese statt der bei Float-EGBI entstehenden Korrekturmatrizen, sodass Float-Tests Atmospheric nicht versehentlich deaktivieren.
+
+### Validierung und offene Prüfung
+
+- Vollständiger Clang/LLD-Windows-Build einschließlich Patch-Rekompilierung, neuem Event, RT64 und aller DXIL-/SPIR-V-Varianten erfolgreich. Der Event-Symbol wurde in den generierten Patch-Overlays bestätigt; ABI-Assertions sichern 40 Byte Override und 112 Byte Environment-Payload.
+- Eine anschließend gemeldete Mod-Loader-Regression mit leerem Modnamen wurde als Fehler der globalen Hook-Regenerierung eingegrenzt. Nach vollständiger Patch-Neugenerierung und Neulink durchlief ein instrumentierter Portable-Test 159 Hook-Slots, 99 regenerierte Vanilla-Funktionen sowie 13 Hooks auf acht Basispatch-Funktionen erfolgreich; auch der zuvor aktive alte `GameState_Update`-Hook lud. Die temporäre Instrumentierung wurde wieder restlos entfernt und der saubere Build erneut erfolgreich erzeugt. Der einmalige Fehler ist damit nicht reproduzierbar und spricht für inkonsistente/stale generierte Build-Artefakte statt für einen Bruch der additiven Event-API.
+- Im Diagnoseprofil waren absichtlich nur ein Mod und keine vollständige bekannte Mod-Reihenfolge eingetragen. Dadurch aktivierte die bestehende First-Scan-Logik fast alle übrigen installierten Mods standardmäßig; der anschließende Lauf zeigte doppelte Figuren und explodierende Polygone. Die damalige Zuschreibung an den Mod-Gesamtstack wurde am 2026-09-06 durch den fehlerfreien 16:19-Build mit derselben praktischen Mod-Installation widerlegt. Diagnoseprofil, Log und Console-Kopie waren bereits entfernt worden.
+- `git diff --check` besteht in Projekt, RT64 und N64ModernRuntime abgesehen von erwarteten Windows-Zeilenendhinweisen.
+- Kein Gameplay-Test in dieser Session. Ausstehend sind die Outdoor-A/B-Prüfung in den auffälligen Clock-Town-/Cutscene-Bereichen sowie Float View/Projection einzeln und gemeinsam bei langsamen Schwenks, hoher Ausgabe-FPS, Cutscenes, Pause und einem Distortion-Effekt.
+- Float-Matrizen adressieren Fixed-Point-Subpixeljitter und die Qualität der HFR-Interpolation, nicht MM's logische Kameraupdate-Rate oder absichtlich stufige Kameralogik.
+
+### Dauerhafte Referenzen
+
+- Mod-API: `docs/MODERN_FOG_MODDING.md` und `include/z64recomp_atmosphere_api.h`.
+- Architektur: `docs/DECISIONS.md`, ADR-005 und ADR-006.
+- Aktueller Build- und Teststand: `HANDOFF.md`.
+
 ## 2026-09-02 — Fog-Kalibrierung, Höhennebel und persistente Grafikoption
 
 ### Ergebnisse

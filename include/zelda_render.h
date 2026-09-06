@@ -35,9 +35,19 @@ namespace zelda64 {
             float view_z = 1.0f;
             float reference_height = 0.0f;
             bool outdoor = false;
+            bool expanded_outdoor = false;
             uint8_t rain = 0;
             uint8_t snow = 0;
             bool storm = false;
+            uint32_t atmosphere_override_mask = 0;
+            float base_height_blend = 0.22f;
+            float morning_height_blend = 0.69f;
+            float scale_height_fraction = 0.015f;
+            float density_variation = 0.12f;
+            float directional_scattering = 0.25f;
+            float saturated_fog_height_budget = 0.03f;
+            float clear_air_far_transmittance = 0.90f;
+            float wet_air_far_transmittance = 0.65f;
         };
 
         void set_environment_fog(const EnvironmentFog& fog);
