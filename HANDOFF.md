@@ -1,38 +1,39 @@
 # Handoff
 
-> Current state: 2026-09-07. The next renderer upgrade is implemented; see the focused feature and runtime documents.
+> Current state: 2026-09-09. Focused lighting-coverage pass completed after restart; no further shadow/cutout investigation was performed.
 
 ## Current deliverable
 
-- Branch: `codex/rt64-modern-fog`. Changes remain uncommitted; preceding RT64/N64ModernRuntime changes were preserved.
+- Branch: `codex/rt64-modern-fog`. This continuation's changes are uncommitted; prior submodule changes and the user's AGENTS edit are preserved.
 - Executable: `_working-directory/build-zelda-validation/Zelda64Recompiled.exe`.
-- SHA-256: `8C910FA1F98C139A94FFDDC78B0990D468291AF0607F75DDB32D0ADD20FF0C9A` (subsequent source edits are comments/documentation only).
-- Ready-to-use isolated profile launcher: `_working-directory/diagnostics/2026-09-06-lighting/Launch-Lighting.cmd`. It selects the correct profile CWD and clears developer playback, Native, fog, lighting and diagnostic overrides. Press Start Game normally.
-- **Enhanced per-pixel diffuse lighting is enabled in Zelda.** It uses existing RSP lights/normals, supports batched skeletal transforms, and preserves authored normal magnitude. Native and unsupported draws remain legacy. The visible gain is smoother model shading, modest at the normal gameplay camera distance rather than a wholesale relight.
-- Atmospheric follow-ups: nearby active collision-water coverage contributes moisture; automatic skyless views receive conservative distance haze. Fog was not broadly revalidated or recalibrated in this run.
-- The prior camera-publication geometry regression remains fixed. No camera precision commands were reintroduced; ADR-006 still applies.
+- SHA-256: `7C3637B5034E3D30C6D6D06DEF66850AD288070663562949E1AA200A2D65E59A`.
+- Isolated interactive launcher: `_working-directory/diagnostics/2026-09-07-coverage/Launch-Lighting.cmd`. Press Start Game normally. This selects the updated executable/profile, clears playback/tints and disables the parked cutout-AA experiment.
+- Expanded per-pixel coverage preserves authored normal magnitude per vertex, including zero/short normals. Large Town wall/ground sections no longer fall back because of another vertex's magnitude.
+- Equivalent light values can use different buffer indices. Shared-matrix draws evaluate the original local directional-light equation, supporting nonuniform scale/shear. Mixed transforms still need a compatible common basis.
+- Fog and camera-publication behavior were not changed in this continuation.
 
-## Lighting behavior and controls
+## Lighting behavior and remaining boundaries
 
-Read `docs/PER_PIXEL_LIGHTING.md` and ADR-007.
+Read `docs/PER_PIXEL_LIGHTING.md` and ADR-007. F1 Lighting and `ZELDA64RECOMP_LIGHTING=original` remain the normal A/B controls. Native always uses original shade RGB.
 
-- `ZELDA64RECOMP_LIGHTING=original` restores original vertex lighting at launch; absent/default enables per-pixel lighting. Fog selection is independent.
-- F1 Game editor / Lighting has a session-local checkbox and eligible/fallback counts. Native automation could not reliably open F1, so recorded A/B tests use separate launches.
-- `RT64_LIGHTING_DIAGNOSTICS=1` emits periodic eligibility/rejection counts; ordinary runs do not emit the periodic trace.
-- Eligibility uses actual draw vertices/light sets, with no actor/scene/mod IDs. Different skeletal world matrices are supported when affine and approximately uniform-scale. Modified colors, raw geometry, flat/unlit draws, mixed light sets, incompatible transforms, degenerate/varying-magnitude normals, and actual positional microcode lights retain legacy lighting.
-- Runtime normals commonly have magnitude about 120, not 127. The first strict unit-normal prototype excluded all lit draws. Final code accepts consistent authored magnitude, preserves its mean, and falls back when length variation exceeds byte-quantization tolerance. Never infer enhancement coverage from a clean screenshot alone.
-- Shared smooth RGB carries transformed normals only for eligible enhanced draws; alpha, UVs, position and raster output varying layout remain intact. The VS adds SV_VertexID; RDPParams is 336 bytes. Current HFR world matrices are shared with RSP processing.
+- The dominant visible rejection in Town was the old draw-wide normal-length gate, including very short/zero normals. A temporary gate-relaxation experiment exposed this; correct per-vertex magnitude transport replaced the gate rather than forcing a draw-wide average.
+- Spatial diagnostics showed Clock Tower interior walls/floor blue while characters were green. These surfaces lack a supported RSP light set and retain authored shading. Do not invent normals or reinterpret RGB to force them into diffuse lighting.
+- Genuine mixed light/color state and unsupported mixed transforms still fall back per draw. Representative Town logs did not show mixed-state rejection dominating; no batch splitting was added.
+- True positional lights still need pixel world position and transform scale to preserve the original anisotropic distance, diffuse clamp and wrapped attenuation. Existing directional-resolved MM point lights work. No new MM function patches or identity gates were added.
+- `RT64_LIGHTING_COVERAGE=1` tints visible surfaces; `RT64_LIGHTING_DIAGNOSTICS=1` logs fallback categories. Temporary aggressive/conservative switches were removed.
+- The scalar normal magnitude adds `TEXCOORD1`; dynamic/specialized SPIR-V and generated DXIL wrappers were rebuilt together. RDPParams remains 336 bytes; `pixelLighting.z` now selects a shared local matrix or the rotated basis.
 
 ## Validation and evidence
 
-Evidence directory: `_working-directory/diagnostics/2026-09-06-lighting/`.
+Evidence remains in `_working-directory/diagnostics/2026-09-07-coverage/` (created before the restart).
 
-- Complete project-local Clang/LLD build passed, including patch regeneration and actual DXIL/SPIR-V shader compilation. Existing compiler warnings remain.
-- Clean baseline and final original/per-pixel A/B at the Southern Swamp owl with a front-facing Link. Completion-timed playback substantially aligns pose/fairy position; it is not exact deterministic state replay. Final comparison: `captures/magnitude-original-front.jpg` and `captures/magnitude-perpixel-front.jpg`.
-- Final title view logged 66 eligible / 2 legacy draws. Gameplay logged roughly 122-123 eligible draws, with unlit/unsupported draws retained as legacy. No shader sorting warnings after the bounded light loop was unrolled.
-- Tested copied installation contains 44 `.nrm` archives plus one `.rtz` texture archive, and 46 enabled configuration entries. Prior documentation's 47 archive count included two loose built-in source files. This is a lightweight real-stack smoke test, not coverage of the user's entire roughly 100-mod installation or all content.
-- Explicit D3D12 selection was attempted, but RT64's existing AMD driver workaround forced actual Vulkan. DXIL builds pass; D3D12 runtime remains unqualified. Do not bypass the workaround merely to claim coverage.
-- Final Atmospheric combined smoke and explicitly logged Native/RDRAM reference both rendered cleanly. All test processes are stopped; copied seed saves/configuration were restored and mods remain unchanged. `final-runtime-manifest.json` records hashes, logs and successful captures. No broad scene, weather, indoor, or individual-mod survey was performed.
+- Targeted project-local Clang/LLD build passed, with actual DXIL/SPIR-V generation. Final Vulkan runs had no shader-sorting/error messages in stderr.
+- Town intro spatial captures: `captures/town-conservative-tint.jpg` shows extensive yellow normal rejection; `town-expanded-tint.jpg` shows the previously rejected environment enhanced. Early captures predate the shared-matrix refinement.
+- Final untinted Town enhanced/original launches and a Native/RDRAM Town smoke check rendered coherently; captures are not frame-matched and do not establish pixel-exact equivalence. Legacy inn view also remained clean. F1 automation was unreliable, so launch-time lighting A/B was used.
+- Representative final Town diagnostic: 263 eligible / 86 set fallbacks, no mixed/transform/positional rejection at that sampled view. This supports the spatial observation, not a global coverage percentage.
+- Copied real profile: 44 `.nrm` and one `.rtz` archive. No mod-loading crash or obvious missing/corrupted geometry/materials observed. This is a stack smoke test, not exhaustive mod qualification.
+- Actual backend Vulkan; DXIL compiled but D3D12 runtime remains unqualified. Cutout AA was explicitly disabled throughout this continuation.
+- Test processes stopped and copied seed restored. Source user-profile save remains SHA-256 `B12F0C6F5546C59DF8E9CD26970A81F8F7CD11803E9F7D4E2E13E6D03D8D1C9B`.
 
 ## Important build correction discovered by the experiment
 
@@ -63,6 +64,8 @@ Use `pwsh -NoProfile -ExecutionPolicy Bypass -File _working-directory/diagnostic
 
 Historical good/bad oracles remain intact. `_working-directory/build-zelda-clang/Zelda64Recompiled.exe` is still the bad historical oracle, not the deliverable. Historical geometry evidence remains in `docs/GRAPHICS_REGRESSION_HANDOFF.md`. Disk shortage from the preceding run is no longer a blocker.
 
-## Next useful experiment
+## Parked side work
 
-For a larger visible change, prototype improved character grounding/shadows using available draw/ground semantics, while preserving legacy shadows for unsupported content. Per-pixel positional lights are a natural extension of the new lighting path, but should not reinterpret MM's positional attenuation or discard mod lights. Keep experiments bounded and judge them in-game; no renderer/engine migration is justified by this run.
+Before the restart, shadow inspection found that MM foot shadows already use light directions/floor collision. Projected mesh shadows need caster/receiver semantics and an overlap-safe mask/composite pass; no shadow implementation was delivered. Preserve that finding for a focused task.
+
+The earlier cutout-MSAA prototype remains in the working tree, unvalidated and unchanged during this continuation. Details: `_working-directory/diagnostics/2026-09-07-cutout/experiment.md`. Its current source defaults on for eligible MSAA draws; the lighting launcher explicitly sets `RT64_CUTOUT_AA=original` to isolate it. Do not treat it as a qualified release feature. No further work on it is required for this lighting pass.

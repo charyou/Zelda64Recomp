@@ -125,6 +125,25 @@ Avoid repeating expensive research whose answer is already adequately establishe
 * new runtime evidence conflicts with it;
 * or a decision-critical gap remains.
 
+### Mod compatibility
+
+Existing Recomp mods are a first-class compatibility target.
+
+Enhanced renderer features should be origin-agnostic:
+
+- classify content from its actual runtime rendering semantics, not from whether it is vanilla or modded;
+- compatible modded content should receive enhanced rendering automatically;
+- unsupported or ambiguous semantics should fall back to existing rendering behavior rather than being approximated incorrectly;
+- do not use scene IDs, actor IDs, asset identities, texture identities, or exact vanilla geometry layouts as compatibility gates when runtime semantic detection can solve the problem;
+- existing mods should not need awareness of new enhanced-renderer APIs merely to remain functional;
+- future mods may opt into richer enhanced semantics where useful.
+
+Avoid unnecessarily expanding the base-recomp patch surface when a less-conflicting integration point can achieve the same result cleanly.
+
+Use real mod stacks as compatibility smoke tests, not as exhaustive proof of compatibility or as a hardcoded definition of supported mods.
+
+Consult the official Recomp modding documentation or `Zelda64Recomp/MMRecompModTemplate` only when a concrete implementation decision depends on mod capabilities or hook/replacement behavior that is not already established in current project documentation.
+
 ## Runtime and visual validation
 
 Rendering work should be evaluated at runtime whenever reasonably possible.

@@ -12,6 +12,7 @@
 
 ### Changed
 
+- Expanded per-pixel lighting to varying-strength landscape normals and shared nonuniform transforms while preserving authored lighting strength and legacy fallbacks.
 - Updated the embedded RT64 renderer to the qualified Plume baseline required for the modern fog work.
 - Atmospheric fog now uses resolved Majora's Mask environment color and distance data while preserving draw-local actor and effect fog.
 - Nearby active water surfaces now strengthen wet-air atmosphere automatically. Skyless world views retain conservative distance haze, while short interiors stay nearly clear and mod overrides remain authoritative.

@@ -4,6 +4,13 @@
 > Einträge, die älter als 3–4 Sessions sind, werden zu Kurzfassungen kompaktiert.
 > Details stehen dann nur noch in der Git-History beziehungsweise den verlinkten Projektdokumenten.
 
+## 2026-09-09 — Broader semantic per-pixel lighting coverage
+
+- Visible Town tint diagnostics identified the whole-draw normal-length restriction as the major avoidable environment rejection. Short/zero/varying normals now retain per-vertex strength through a scalar varying; the shader normalizes direction separately. No draw splitting or authored-color relighting.
+- Light-set equality uses relevant values, not buffer identity. Shared-matrix draws reuse the original local directional equation, including nonuniform scale/shear. Mixed unsupported state and true positional lights remain legacy. Temporary aggressive modes removed; spatial diagnostics retained.
+- Targeted build and Vulkan Town enhanced/original/Native checks passed with the copied 44-NRM/one-RTZ stack. No shader-sorting errors or obvious geometry/material corruption; captures are not frame-matched. Final executable SHA `7C3637B5034E3D30C6D6D06DEF66850AD288070663562949E1AA200A2D65E59A`. D3D12 runtime unqualified. Evidence: `_working-directory/diagnostics/2026-09-07-coverage/`.
+- Resumed single-agent after restart. Shadow findings and prior cutout-AA prototype parked; cutout disabled in lighting runs/launcher. Atmosphere unchanged. Updated lighting documentation and ADR-007.
+
 ## 2026-09-07 — Per-pixel diffuse lighting and small semantic atmosphere follow-ups
 
 - Implemented enhanced per-pixel ambient/directional lighting using actual RSP normals/light sets and HFR world matrices. Different skeleton limb transforms can share a draw; incompatible transforms, mixed lights, authored color overrides, varying normal magnitudes and actual positional microcode lights preserve legacy shading. Native remains original. Zelda enables the feature; F1 Lighting and `ZELDA64RECOMP_LIGHTING=original` provide A/B control. ADR-007 and `docs/PER_PIXEL_LIGHTING.md` document the boundary.

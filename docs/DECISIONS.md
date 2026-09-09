@@ -88,12 +88,12 @@
 
 ## ADR-007 — Per-pixel diffuse lighting reuses actual RSP semantics
 
-**Status:** Accepted for the first enhanced implementation
+**Status:** Accepted; coverage refinement 2026-09-09
 
 **Context:** RT64 already retains authored normals, ambient/directional lights, per-vertex lighting state and interpolated world transforms. Reconstructing MM lighting in a second semantic system is unnecessary to improve coarse vertex-lit characters.
 
-**Decision:** Evaluate those existing lights per pixel on eligible enhanced draws. Gate by a uniform per-vertex light set, usable normals and compatible affine transforms. Transform each vertex normal into a shared lighting space, allowing different skeleton limb matrices within one draw; retain legacy for nonuniform scale/shear/projective transforms. Carry normals through the existing smooth RGB interpolant only when both stages select the enhanced path. Preserve original vertex lighting in Native and on all unsupported draws, including actual positional microcode lights and modified colors. No Zelda identities or assumptions about vanilla meshes belong in this renderer feature.
+**Decision:** Evaluate existing lights per pixel on eligible enhanced draws. Compare light values rather than buffer identity. Carry normal direction through smooth RGB and authored magnitude through a scalar interpolant; zero/short/varying normals are supported without a draw-wide length gate. A shared world matrix uses the original local directional-light equation, including nonuniform scale/shear. Different skeleton matrices use a common rotated basis when their transforms are compatible. Preserve original vertex lighting in Native and on unsupported draws, including actual positional microcode lights and modified colors. No Zelda identities or assumptions about vanilla meshes belong in this renderer feature.
 
-**Why:** This gives a contained diffuse-shading improvement while preserving the lights chosen by the game and its mods, shader output linkage, draw-local alpha/fog and existing combiner/blender behavior. HFR uses the renderer's already interpolated matrices.
+**Why:** Visible Town diagnostics showed that the initial draw-wide normal-length gate rejected large surfaces. Per-vertex magnitude transport preserves the shading information that motivated the gate and removes its coarse fallback without batch splitting. Draw-local alpha/fog and combiner/blender behavior remain intact. HFR uses the renderer's already interpolated matrices. The added scalar varying passed the current Vulkan runtime check; this does not qualify D3D12 runtime or supersede atmospheric camera constraints.
 
 **Consequences:** Lighting is independently selectable from fog. Future positional lighting or shadows must preserve the current fallback rather than silently dropping unsupported lights. New vertex system inputs and RDP layout changes still require synchronized shader builds and runtime API checks. See `docs/PER_PIXEL_LIGHTING.md` for eligibility and integration details.
