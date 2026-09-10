@@ -9,6 +9,7 @@
 
 #define HLSL_CPU
 #include "hle/rt64_application.h"
+#include "hle/rt64_workload_queue.h"
 #include "rt64_render_hooks.h"
 #include "overloaded.h"
 
@@ -230,6 +231,9 @@ void set_application_user_config(RT64::Application* application, const ultramode
     application->userConfig.internalColorFormat = to_rt64(config.hpfb_option);
     application->userConfig.displayBuffering = RT64::UserConfiguration::DisplayBuffering::Triple;
     application->setFogMode(to_rt64(config.fog_option));
+    if (application->workloadQueue) {
+        application->workloadQueue->rtShadows = config.rt_shadows;
+    }
 }
 
 ultramodern::renderer::SetupResult map_setup_result(RT64::Application::SetupResult rt64_result) {
@@ -369,6 +373,10 @@ zelda64::renderer::RT64Context::RT64Context(uint8_t* rdram, ultramodern::rendere
         app = nullptr;
         return;
     }
+
+    // Persistent setting, with an explicit launch override for finite diagnostics.
+    const char* shadowOverride = std::getenv("RT64_RT_SHADOWS");
+    app->workloadQueue->rtShadows = shadowOverride ? std::strcmp(shadowOverride, "1") == 0 : cur_config.rt_shadows;
 
     // Same presentation switch as F3, available without OS keyboard injection.
     // A new application starts with viewRDRAM=false; apply this once after setup.

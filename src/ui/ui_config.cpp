@@ -624,6 +624,12 @@ public:
         bind_option(constructor, "msaa_option", &new_options.msaa_option);
         bind_option(constructor, "rr_option", &new_options.rr_option);
         bind_option(constructor, "fog_option", &new_options.fog_option);
+        constructor.BindFunc("rt_shadows",
+            [](Rml::Variant& out) { out = new_options.rt_shadows ? "On" : "Off"; },
+            [](const Rml::Variant& in) {
+                new_options.rt_shadows = in.Get<std::string>() == "On";
+                graphics_model_handle.DirtyVariable("options_changed");
+            });
         constructor.BindFunc("rr_manual_value",
             [](Rml::Variant& out) {
                 out = new_options.rr_manual_value;

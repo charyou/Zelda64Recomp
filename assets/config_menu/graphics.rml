@@ -4,7 +4,7 @@
     <body>
         <form class="config__form">
             <div class="config__hz-wrapper">
-                <div class="config__wrapper" data-event-mouseout="set_cur_config_index(-1)">
+                <div class="config__wrapper" style="overflow-y: auto;" data-event-mouseout="set_cur_config_index(-1)">
                     <div class="config-option" data-event-mouseover="set_cur_config_index(0)">
                         <label class="config-option__title">Resolution</label>
                         <div class="config-option__list">
@@ -277,7 +277,7 @@
                                 data-checked="fog_option"
                                 value="Original"
                                 id="fog_original"
-                                style="nav-up: #hr_original; nav-down: #apply_button"
+                                style="nav-up: #hr_original; nav-down: #rt_shadows_off"
                             />
                             <label class="config-option__tab-label" for="fog_original">Original</label>
                             <input type="radio"
@@ -287,7 +287,7 @@
                                 data-checked="fog_option"
                                 value="FaithfulPerPixel"
                                 id="fog_faithful"
-                                style="nav-up: #hr_16_9; nav-down: #apply_button"
+                                style="nav-up: #hr_16_9; nav-down: #rt_shadows_on"
                             />
                             <label class="config-option__tab-label" for="fog_faithful">Faithful</label>
                             <input type="radio"
@@ -297,9 +297,23 @@
                                 data-checked="fog_option"
                                 value="Atmospheric"
                                 id="fog_atmospheric"
-                                style="nav-up: #hr_full; nav-down: #apply_button"
+                                style="nav-up: #hr_full; nav-down: #rt_shadows_on"
                             />
                             <label class="config-option__tab-label" for="fog_atmospheric">Atmospheric</label>
+                        </div>
+                    </div>
+
+                    <div class="config-option" data-event-mouseover="set_cur_config_index(8)">
+                        <label class="config-option__title">RT Sun Shadows</label>
+                        <div class="config-option__list">
+                            <input type="radio" name="rt-shadows" data-checked="rt_shadows" value="Off" id="rt_shadows_off"
+                                data-event-blur="set_cur_config_index(-1)" data-event-focus="set_cur_config_index(8)"
+                                style="nav-up: #fog_original; nav-down: #apply_button" />
+                            <label class="config-option__tab-label" for="rt_shadows_off">Off</label>
+                            <input type="radio" name="rt-shadows" data-checked="rt_shadows" value="On" id="rt_shadows_on"
+                                data-event-blur="set_cur_config_index(-1)" data-event-focus="set_cur_config_index(8)"
+                                style="nav-up: #fog_atmospheric; nav-down: #apply_button" />
+                            <label class="config-option__tab-label" for="rt_shadows_on">On (Experimental)</label>
                         </div>
                     </div>
 
@@ -341,6 +355,9 @@
                     <p data-if="cur_config_index == 7">
                         Selects how the game's authored fog is rendered. <b>Original</b> reproduces N64 vertex fog. <b>Faithful</b> evaluates the same response per pixel. <b>Atmospheric</b> adds height-aware aerial perspective and subtle world-space variation when Majora's Mask requests environmental fog.
                     </p>
+                    <p data-if="cur_config_index == 8">
+                        Adds experimental hard sunlight shadows to supported opaque surfaces. Requires a ray-tracing-capable GPU and per-pixel lighting. Some surfaces and effects retain their original lighting. May reduce performance.
+                    </p>
                 </div>
             </div>
             <div class="config__footer">
@@ -353,7 +370,7 @@
                         data-attrif-disabled="!options_changed"
                         onclick="apply_options"
                         id="apply_button"
-                        style="nav-up:#fog_original"
+                        style="nav-up:#rt_shadows_off"
                     >
                         <div class="button__label">Apply<span class="prompt-font-sm">{{gfx_help__apply}}</span></div>
                     </button>

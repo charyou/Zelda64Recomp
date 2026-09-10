@@ -1,106 +1,86 @@
-# Experimental hardware RT foundation
+# Hardware RT foundation and directional hard shadows
 
-Current implementation and validation: 2026-09-09. This is an opt-in developer primary-hit inset, not production ray-traced lighting. Vulkan runtime proof exists on an AMD Radeon RX 9070 XT.
+Current: 2026-09-10 Run 2 finished; mandatory result checkpointed before UI. Vulkan hardware visibility and real Enhanced shadows visibly validated. Run 1 is preserved in git history; its primary-hit diagnostic remains independent. The incomplete historical `RT_ENABLED` renderer remains disabled.
 
-## Thesis and ownership
+## Direction and lighting ownership
 
-The thesis held: reconstruct only the missing RT64 orchestration and stage shaders around existing Plume APIs and presentation-time geometry. The old `RT_ENABLED` feature remains disabled. No removed legacy classes, full DI/GI renderer, historical donor code, renderer abstraction, CPU geometry upload, or raster world-position varying was introduced.
+Zelda's `patches/play_patches.c` publishes `envCtx.sunPos` through the existing environment bridge. `src/main/rt64_render_context.cpp` puts it in `AtmosphereParameters::sunDirection`; Application snapshots that metadata onto Workload. It is a world-space vector TOWARD the resolved sun, not a position requiring subtraction of the camera or receiver. The MM semantic reference `src/code/z_kankyo.c` draws the sun at `view.eye + sunPos`; its ordinary outdoor `light1Dir` uses the same sine/cosine vector at 1/25 scale, quantized to bytes. No sun direction is invented or reconstructed in RT64.
 
-Reused roles: WorkloadQueue's `rtEnabled`, the `DeveloperShortcut::RayTracing` route, RSPWorldCS/output buffers, executable indexed draw ranges, framebuffer replay, and Plume AS/pipeline/SBT/dispatch APIs. Reconstructed roles: `RaytracingDebug`, its isolated descriptor/pipeline/resource lifetime, and `PrimaryHitRT.hlsl`. Generic Vulkan AS defects/contract gaps also needed repair; the prepared architectural reconciliation was correct about API availability but did not establish runtime correctness of every backend operation.
+The vector can diverge from authored draw-local lighting, including indoor and original cutscene behavior. Production shadows therefore affect only actual directional RSP inputs whose normalized world direction agrees with normalized sun by dot >0.9998 (byte-quantization tolerance). Other directional terms and positional/local light semantics remain unchanged. This is a narrow compatible-direction contract, not a claim that every RSP light is sunlight.
 
-## Implemented files and behavior
+## Files and exact flow
 
-Paths below are relative to `lib/rt64` unless explicitly prefixed otherwise.
+Paths below are relative to `lib/rt64`.
 
-| File / symbol | Change and reason |
-| --- | --- |
-| `src/render/rt64_raytracing_debug.h/.cpp`, `RaytracingDebug::reset/record` | New per-framebuffer owner for BLAS/TLAS, scratch, instance/SBT uploads, descriptors, RT pipeline, debug texture and inset copy pipeline. `record` builds, traces and composites; initialization exceptions disable that owner and leave raster output. |
-| `src/render/rt64_framebuffer_renderer.h/.cpp`, `Framebuffer::debugRT`, `addFramebuffer`, `recordFramebuffer` | Reset eligibility each replay; collect supported executable indexed ranges while retaining their normal raster draws; record RT after the framebuffer's raster scenes. Only Enhanced participates. |
-| `src/hle/rt64_workload_queue.cpp` | Initialize `rtEnabled` from exact `RT64_RT_PRIMARY_HIT=1`; snapshot it with `raytracing && bufferDeviceAddress` capability gates. Request the existing VertexProcessor whenever debug RT is enabled, including unmatched frames. No new world-position producer. |
-| `src/shaders/PrimaryHitRT.hlsl` | New ray-generation, miss and closest-hit library. Barycentric colors prove triangle intersections. Dark navy means miss; cyan marks the inset border. |
-| `CMakeLists.txt` | Compile the new C++ owner and invoke the surviving `build_ray_shader`; generate real DXIL/SPIR-V and their C/header wrappers. Apple uses SPIR-V generation only and remains unqualified. |
-| `src/contrib/plume/plume_render_interface_types.h` | Add optional `RenderTopLevelASInstance::bottomLevelStructure`, allowing Vulkan to use the actual AS device address while retaining the existing DXR backing-buffer contract. |
-| `src/contrib/plume/plume_vulkan.h/.cpp` | Query AS scratch alignment and honor it in allocation; preserve one BLAS build range per geometry in backend-private build data; use the same TLAS flags for size query/build; query the actual BLAS AS address when supplied. |
+- `src/hle/rt64_workload_queue.h/.cpp`: independent default-off `rtShadows`, `rtVisibility`, existing `rtEnabled` primary state. Capability-gated union requests the existing presentation-time VertexProcessor/world position producer, including unmatched frames. DrawParams carries independent mode values.
+- `src/render/rt64_framebuffer_renderer.cpp::addFramebuffer`: collects conservative executable opaque meshes and parallel `surfaces` records. Selects one perspective projection; sunlight consumers require published world-camera agreement using the same position/orientation tolerances as atmosphere. Primary-only diagnostics can still view their previous wider projection subset. Screen mapping includes RSP viewport scale/translation and the actual RasterVS scale/offset. RSPProcessCS negates clip Y and RasterVS negates screen Y again: both must be included, otherwise the mask is vertically flipped.
+- `src/render/rt64_raytracing_debug.h/.cpp::record`: remains the small per-framebuffer owner despite its historical name. Builds BLAS/TLAS and traces BEFORE ordinary raster scenes. `composite` separately copies a diagnostic inset AFTER raster only when selected. Native never collects/uses this path.
+- `src/shaders/PrimaryHitRT.hlsl`: primary intersection, surface reconstruction, sequential secondary visibility and independent barycentric/visibility diagnostic output. Camera rays cover NDC0 through0.99 as before; no promise of full far-plane coverage.
+- `src/shared/rt64_framebuffer_params.h`: 48-byte FramebufferParams, with explicit padding and `float4 shadowSun` at byte32. XYZ normalized world sun, W production enable. RDPParams stays336 bytes. No raster-stage varying or linkage change.
+- `src/render/rt64_descriptor_sets.h`: framebuffer set3 adds texture t3 `gDirectionalVisibility`, with valid dummy texture on disabled/failure paths. Each participating framebuffer binds its own result before raster; enable is zero on unsupported/empty frames.
+- `src/shaders/RasterPS.hlsl`: full-resolution unfiltered Load at SV_Position.xy. Accept the mask only if call identity matches `instanceRDPParams` identity and primary clip W agrees with `1/SV_Position.w` within max(0.05,abs(W)*0.0001). Otherwise visibility=1. This rejects unsupported or overlapping raster receivers instead of darkening a final image.
+- `src/shaders/PerPixelLighting.hlsli::shadePerPixel`: multiply only matching directional diffuse contributions by accepted visibility, before original light sum clamp and color combiner. Keep ambient, normal magnitude, shared-matrix equation, other light terms and all existing fallback semantics intact. Fog/blending execute normally afterward.
+- `CMakeLists.txt`: isolated RT shader library targets lib_6_5 for GeometryIndex; shared raster outputs and wrappers regenerate through the existing corrected shader build flow.
 
-**Plume is a nested submodule. Its edits are inside `lib/rt64/src/contrib/plume`, not represented by the outer RT64 diff alone.** All changes remain uncommitted. No submodules were reset, updated, replaced, or moved to upstream state. N64ModernRuntime and MM patches are unchanged.
+Actual production flow:
 
-## Actual data flow
-
-```text
-Workload RSP data + current/interpolated transforms and vertex velocity
-  -> existing VertexProcessor / RSPWorldCS
-  -> OutputBuffers.worldPosBuffer (float4 stride, XYZ for intersection)
-  + DrawBuffers.faceIndicesBuffer
-  -> addFramebuffer's eligible executable indexed ranges
-  -> one multi-geometry world-space BLAS per participating framebuffer
-  -> one identity, double-sided TLAS instance
-  -> isolated SceneBVH descriptor + PrimaryHitRT pipeline + three SBT records
-  -> traceRays at half target width and half target height
-  -> RGBA8 UAV primary-hit texture
-  -> existing FullScreenVS/TextureCopyPS with a target-matched copy pipeline
-  -> upper-left quarter of the Enhanced color target
-  -> ordinary resolve/presentation
+```
+Workload sun + presentation-time world positions + executable opaque ranges
+-> multi-geometry BLAS / identity TLAS
+-> primary surface hit + secondary ray toward published sun
+-> full-resolution raw visibility / receiver identity / clip W texture
+-> matching raster surface + matching directional diffuse contribution
+-> original combiner, fog, blending, resolve and presentation
 ```
 
-The inset remains in the renderer's framebuffer path, including normal target resolve. It is diagnostic content, so it can also appear in Enhanced framebuffer feedback. Native/RDRAM output does not receive it.
+## Minimal reusable secondary-ray and Hit -> Surface contract
 
-## Geometry and camera policy
+`SurfaceHit` payload is24 bytes: float2 barycentrics, hit distance, GeometryIndex, PrimitiveIndex, hit flag. `PrimaryHit` fills identity; `PrimaryMiss` clears the flag. `RaytracingDebug::surfaces[GeometryIndex]` is uint4: RDP call index, executable index start, face count, projection index. This is replay-local identity, not a temporal stable object ID. Positions and indices are the existing GPU buffers; indexed triangle vertices supply the geometric normal. No material database or Zelda actor/scene IDs.
 
-- Perspective `IndexedTriangles` only, with positive face count and nonempty executable scissor; exclude VertexTestZ-rewritten ranges, extended commands, rectangles, raw triangles and orthographic/UI draws.
-- Require depth compare and update, `ZMODE_OPA`, pixel Z, no alpha compare, no coverage-times-alpha, no clear-on-coverage, and no framebuffer alpha blending according to `Blender::usesAlphaBlend`.
-- `triangles.indexStart` and `triangles.faceCount * 3` select an in-bounds slice of `faceIndicesBuffer`. Vertex format is `R32G32B32_FLOAT`, stride 16; index format is `R32_UINT`. The vertex count is the Workload's actual vertex count. `isOpaque=true` is deliberate.
-- The first eligible projection index per framebuffer supplies `inverse(modViewProjTransforms[index])`. Other projection indices are excluded, even if they might be compatible. There are no scene, actor, asset, texture or mod identity gates.
-- Whole triangles participate; raster viewport/scissor clipping is not reproduced inside the AS. TLAS disables face culling for this double-sided debug view. This is not yet a production shadow opacity/culling contract.
-- Rays unproject NDC depth 0 and 0.99, start at the former and stop at the latter. This bounded diagnostic interval is not full raster near/far coverage; distant geometry can be absent. Custom viewport placement, multiple cameras and singular/custom projective world transforms are not qualified.
-- The world buffer is generated at the same replay weights as the renderer. BLAS and TLAS rebuild every enabled framebuffer replay; no refit, compaction or object-space cache. Unmatched frames explicitly run VertexProcessor as well.
-- Per-framebuffer resources retain capacity and grow as needed. The existing WorkloadQueue graphics fence is waited before renderer reuse. CPU mesh lists clear every replay; a disabled/empty scene performs no RT dispatch. Descriptors and AS objects survive GPU execution; AS objects are released before replacing their backing allocations.
+`traceVisibility(origin,direction,maxDistance)` uses a separate uint occlusion payload initialized blocked, with `VisibilityMiss` clearing it. It uses FORCE_OPAQUE, ACCEPT_FIRST_HIT_AND_END_SEARCH, SKIP_CLOSEST_HIT_SHADER, mask255. Rays execute sequentially from ray generation, so recursion depth remains1. The SBT contains one raygen, two misses (primary index0, visibility index1), one primary closest-hit group; table currently256 bytes. A future AO ray can reuse origin/normal reconstruction and this occlusion convention without replacing the renderer. Richer surface lookup can start at RDP call/index identity already retained.
 
-## Shader, descriptor and synchronization contract
+Origin offset is along the geometric normal oriented toward the outgoing sun hemisphere. Bias=max(0.05 world units, largest absolute world coordinate*2e-6), TMin0.02, sun TMax1,000,000. This is a small conservative initial bias, not a qualified solution for arbitrary coordinate scales.
 
-No changes to RasterVS/RasterPS linkage, RDPParams (336 bytes), per-pixel-light resources, normal-magnitude `TEXCOORD1`, dynamic/specialized raster wrappers, or fog ABI.
+RT descriptors: t1 AS, u2 RGBA8 debug output, t3 structured uint4 surface records, t4 structured float4 world positions, t5 structured uint indices, u6 RGBA32F visibility. Raygen push constants112 bytes: inverse VP64, sun16, screen16, modes16. Visibility texture stores (visibility, RDP call+1, clipW, primitive+1); misses store (1,0,0,0). Clip W is reconstructed from the primary segment's homogeneous endpoints. Output is raw and unfiltered, with enough receiver information to extend later signal processing; there is no history or temporal identity yet.
 
-The isolated RT layout has one 64-byte raygen push-constant matrix at `b0`, one AS `SceneBVH` at `t1/space0`, and one `RWTexture2D<float4>` at `u2/space0`. CPU descriptor ordinals come from the descriptor builder. Payload is 16 bytes; attributes are two floats; recursion depth is one. Shader symbols are `PrimaryRayGen`, `PrimaryMiss`, `PrimaryHit`; the closest-hit group is `PrimaryHitGroup`. SBT contains one raygen, one miss and one hit-group record. Plume computes handle/record/table alignment; the SBT buffer uses `SHADER_BINDING_TABLE` and is uploaded once. Descriptor sets are passed to the SBT builder for its cross-backend contract.
+## Narrow caster/receiver policy
 
-The output is single-sample RGBA8 UNORM with storage usage. The inset copy uses its own layout with the existing `TextureCopyCB` (16 bytes, pixel push constants at b0) and t1 texture descriptor. Its pipeline matches the destination sample count and format, drawing into the actual color target before normal resolve. MSAA runtime was not tested.
+Casters retain Run 1 eligibility: nonempty executable indexed perspective triangles, depth-tested and depth-writing, ZMODE_OPA, pixel Z, alpha compare NONE, no coverage-times-alpha, clear-on-coverage or framebuffer alpha blending, in-bounds index ranges, no VertexTestZ-rewritten indices. Rectangles, raw/UI/orthographic, unsupported alpha/cutouts, coverage opacity and blends retain raster-only behavior. No broad material coverage expansion.
 
-AS input transitions follow RSPWorldCS writes. Plume COMPUTE barriers include Vulkan AS-build and ray-tracing stages. Ordering is world/index read + BLAS/scratch write -> BLAS build -> BLAS read/scratch reuse + TLAS write -> TLAS build -> TLAS/SBT read -> output GENERAL -> trace -> output SHADER_READ + target COLOR_WRITE -> raster inset. Instance uploads have AS-input usage; scratch has AS-scratch/storage usage; results use AS-buffer allocation. Uploads and reused resources depend on the existing waited graphics fence. D3D12 generic code and DXIL compile, but its runtime/barrier behavior is unqualified.
+Opaque participating triangles deliberately cast from BOTH sides. This is an explicit thin-shell occlusion policy, not accidentally inherited raster winding or a claim to reproduce one-sided materials. TLAS disables face culling; opaque shadow rays do not request face culling. Raster receiver culling remains unchanged. The identity/depth check prevents a hidden/cull-rejected primary hit from arbitrarily shading another raster surface.
 
-## Focused validation actually performed
+Receivers additionally require existing enhanced per-pixel-light eligibility, camera/projection participation, matching call/depth and a matching directional term. Original lighting, Native, unsupported lights/materials and unmatched pixels retain their old output. Whole eligible triangles cast, including their offscreen portions; raster scissor clipping is not reproduced in the AS. Only submitted geometry participates, so offscreen game-culled casters can be absent. Secondary consumers exclude inward/asymmetric custom clip ratios; symmetric outward guard bands are accepted. Multiple cameras/custom non-affine coordinate systems are outside qualification; do not broaden them with heuristics in Run 3.
 
-Initial identities: parent `codex/rt64-raytracing` at `ef88a580f28776ae8a984a151bfa17178a9e2d7c`; RT64 `codex/raytracing` at `cfbe357c82c6b7611f46d5252e89b97333d1d0ed`. RT64 was initially clean; supplied research and `lib/rt64 und md files.zip` were already untracked in the parent. The requested `git submodule status` could not execute because that Git shell could not resolve `basename`, `sed`, and `git-sh-setup`; direct repository status/HEAD checks succeeded. No recovery mutation was performed.
+## Resources and synchronization
 
-Build command (PowerShell 7, documented VS/LLVM 19.1.3/LLD/Ninja environment):
+Existing world-write -> BLAS -> TLAS -> ray-trace barriers remain. Surface upload gets a read barrier; raw result transitions GENERAL -> SHADER_READ before raster. Per-framebuffer resource lifetime and existing waited graphics fence protect reuse. BLAS/TLAS rebuild every enabled replay. Surface metadata upload is currently recreated per replay; no object-space cache/refit redesign. Diagnostics use separate RGBA8 output and the existing target-matched FullScreenVS/TextureCopyPS inset. Both outputs are full target size; the optional inset displays at half size.
 
-```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File _working-directory/diagnostics/2026-09-06/build-control.ps1
-```
+No new Plume modifications were needed. Run 1's committed nested Plume fixes remain: per-geometry Vulkan BLAS ranges, queried scratch alignment, consistent TLAS flags and actual AS device address. Preserve them across updates.
 
-The script configures the existing `_working-directory/build-zelda-validation`, then runs `cmake --build ... --target Zelda64Recompiled --parallel 12`. New `PrimaryHitRT.hlsl.spv/.dxil`, both generated `.c/.h` wrappers, RT64, Plume and the executable compiled. The initial C++ attempt used a nonexistent RenderMultisampling inequality operator; it was corrected to compare sample count. No new raster shaders required regeneration because their interfaces were unchanged. Existing patch generation ran as part of the documented target; no patch sources were changed.
+## Focused verification and reproduction
 
-Final executable SHA-256: `925F6959DD675608C9A14FEC5739B6A47DCA51D0896C0FC38A21DC6D7C6068BC`.
+Build: `pwsh -NoProfile -ExecutionPolicy Bypass -File _working-directory/diagnostics/2026-09-06/build-control.ps1`. Mandatory candidate SHA256 `DD9CE9427BE7BDBEB129E717A03B9FF3B5457D9FB27E556EA92FC5450792474F`. RT SPIR-V SHA `C54EEDE1F1135287D92432E9F2B8371F3CAF3366AE2EA9672E6C55BDCEB39398`; DXIL SHA `A74142DC67F9F5A42A17844423E1838F501F16EDF88EB7F2734EE3FA8E56237A`. Real objects and C/header wrappers generated, not just dependency files. Raster dynamic/specialized/library consumers also regenerated. `build-orientation.log` records the last correction build.
 
-New SPIR-V SHA-256: `C6E5DBA30A8C06BE1FA87630FA78C24689F92E7335899BBD8AFDF2E85AA51586`.
+`_working-directory/diagnostics/2026-09-10-rt-shadows/run.ps1 -Mode off|primary|visibility|shadows` restores the existing copied seed, forces Vulkan/Atmospheric/per-pixel lighting/cutout-original, and reuses the finite972-read Town playback. Interactive execution boundary is needed. Never restore a seed or replace the executable while another copied candidate runs; launcher now rejects that condition. Stop with process exit wait. The original seed SHA remains `B12F0C6F5546C59DF8E9CD26970A81F8F7CD11803E9F7D4E2E13E6D03D8D1C9B`.
 
-New DXIL SHA-256: `CA3D21B4998C41AC3C162A9E91D24D652D6E7A0079E89BD75BBA0A28D7C23E18`.
+Root directly observed and saved `primary-town.png`, `visibility-town.png`, `shadows-town.png`, `off-town.png`: upright real geometry intersections; yellow visible walls versus blue occluded ground/Link/structures; no diagnostic inset in production; localized diffuse changes versus OFF with sunlit wall samples unchanged. Camera matches, animation/time does not match exactly. See HANDOFF for measured static samples. No severe visible corruption or device loss in these corrected checks. Feature-off has no RT initialization. Vulkan RX9070XT with real copied mod stack is a smoke test only; no validation layers, D3D12 runtime, MSAA, broad HFR/transition/mod or performance qualification.
 
-Runtime evidence is in `_working-directory/diagnostics/2026-09-09-rt/`. `run-rt.ps1` reuses the already isolated copied profile in `2026-09-07-coverage/runtime`, restores its seed before launch, and starts `rt-primary-hit.exe` with explicit CWD and Normal window style. It selects Vulkan, Atmospheric fog, per-pixel lighting, `RT64_CUTOUT_AA=original`, developer autostart and the existing finite `load-town.json`. `ZELDA64RECOMP_DEV_NATIVE=0` deliberately causes the existing diagnostic to report rejection and retained Enhanced mode; it does not select Native.
+The earlier candidate had a user-observed vertical flip, fixed by including RSPProcessCS's Y negation in screen inversion. Early runtime setup was also unreliable due to hidden concurrent instances after sandbox stop denial; temporary menu scripts are unnecessary with exclusive launch. Old Run1 PNG files in the earlier evidence directory are one-byte placeholders on this checkout; use the real Run2 PNGs rather than assuming those files are usable image evidence.
 
-Save `a` (Town) loaded through the nine-step/972-read playback. The seed save hash is `B12F0C6F5546C59DF8E9CD26970A81F8F7CD11803E9F7D4E2E13E6D03D8D1C9B`; playback hash is `0257A44B80D56047E88FA810EA06E3A577801077F67DFA8B8F0837C8138E1C1C`. The copied real mod stack was retained. This is one stack smoke test, not exhaustive compatibility evidence.
+No optional secondary diagnostic or future-run feature was added. Run3 starts at `surfaces`, `SurfaceHit` and `traceVisibility` for Surface Classification + AO; retain original/Native compatibility, conservative fallback and the independently usable primary oracle.
 
-Failures and results:
+## Final Graphics control, build and user verification
 
-1. Initial `rt-on` run on RX 9070 XT recorded 4 meshes/96 triangles (early title view), TLAS and `traceRays 800x480`, then device loss (`0xFFFFFFFC`). User also reported preexisting driver instability, so the crash alone does not attribute causality. Inspection nevertheless found a definite backend bug: a multi-geometry BLAS build passed just one aggregate build-range structure. The per-geometry range fix, scratch alignment, consistent TLAS flags and actual AS address contract are present in the final candidate.
-2. Corrected sandbox launch had no repeated loss but no targetable native window. Relaunched on the interactive desktop using the documented execution boundary.
-3. `rt-interactive.stderr.log` confirms Vulkan, Enhanced, RX 9070 XT hardware RT pipeline, 256-byte SBT, BLAS/TLAS and trace/inset recording. The 4/96 count is the first logged title submission, not Town's geometry count.
-4. `primary-hit-town.png` visibly proves hits on actual Town architecture, ground and Link. Subsequent observations showed Link's idle animation changing in the RT image. This confirms real GPU intersection output, not merely successful CPU calls. The inset's barycentric colors are deliberate, not a raster corruption symptom.
-5. The native capture helper crashed once (exit 3221225477); resetting/rebinding and retrying captured the game successfully. No subsequent game device-loss errors appeared in the corrected run.
-6. One injected F2 press did not visibly disable RT. The existing F2/DeveloperShortcut route remains wired, but native keyboard injection is unqualified. Stopped the process and relaunched the same binary with `run-rt.ps1 -Name baseline-off -Off`. `baseline-off-town.png` confirms the inset is absent and Enhanced rendering is restored, with no RT initialization records or severe visual regression in its log/capture. Images are not frame-matched.
-7. Final candidate showed no black frame, obvious geometry wedge/corruption, crash or device loss during the focused check. No validation-layer-enabled run was performed; clean stderr is not a claim of full Vulkan validation-layer qualification. D3D12 compiled as part of Plume and DXIL generation; no D3D12 runtime run. Native, HFR edge cases, scene transitions, MSAA and performance were not separately qualified in this task.
+After the mandatory checkpoint, added persistent `GraphicsConfig::rt_shadows` (default false) in `lib/N64ModernRuntime/ultramodern/include/ultramodern/config.hpp`. Parent `src/game/config.cpp` serializes/loads/resets it; `src/ui/ui_config.cpp` binds Off/On and marks pending changes. `assets/config_menu/graphics.rml` adds one row with help/navigation and scroll overflow on the options column. `src/main/rt64_render_context.cpp` applies the setting to `WorkloadQueue::rtShadows` after setup and on configuration changes. Startup RT64_RT_SHADOWS overrides the saved setting only at launch; subsequent Graphics Apply takes effect normally. `src/hle/rt64_state.cpp` adds the independent session toggle beside per-pixel lighting in F1. Native and capability gates remain intact. No settings-system redesign.
 
-All test game processes were stopped and the copied seed save restored. The original user profile was not used for game writes. Build logs include `build-address.log`; temporary evidence, shaders and ROM-derived products remain ignored. Final parent/RT64/Plume diff whitespace checks passed.
+The user manually verified the Graphics/F1 setting in the diagnostics runtime and closed it. Root does not claim a completed automated UI toggle test; injected Escape was ineffective and the user explicitly ended further UI verification. The final normal project build then succeeded from the finished working tree. Final executable SHA256 is `D8DF2EF071240676433F8DD02D14BE70B4CD3DF9651A8D645D85D4121F685CD8` at `_working-directory/build-zelda-validation/Zelda64Recompiled.exe`; assets are synchronized. Same hash at the existing isolated profile's `rt-shadows.exe` and `finished-run2/Zelda64Recompiled.exe`. `finished-run2/final-build.log` and `final-hashes.txt` provide the final build record. The earlier mandatory-checkpoint hash above identifies the image-evidence candidate, not the final executable. Shared shader objects/wrappers were already regenerated and compiled; the final incremental build consumed them. No new runtime test after this final successful build, per user instruction.
 
-## Limits and immediate next step
+Before finishing, preserved the pre-final known-good binary (SHA F88572810AADDD311110101DF635161B74F71AB8630557631E91E1938497FB21), existing PNG/log evidence and six supplied user reference screenshots under `finished-run2/`. The latter are reported with sun shadows and Atmospheric fog active; they are qualitative references, not matched A/B captures.
 
-The delivered endpoint is a working hardware primary-hit debug view. It has no production shadows, GI, reflections, alpha tests, receiver integration, material shading, object-space reuse or performance qualification. The scene is a conservative subset of one projection, traced double-sided within the documented finite diagnostic depth interval. Some visible raster surfaces and effects are intentionally absent.
+Known issues are deliberately left unresolved:
 
-Next coding step: add a second debug visibility ray toward one existing directional RSP light at a primary hit, reusing this TLAS/pipeline/output. Keep the current primary-hit mode as the correctness reference; do not require a new raster varying or production shadow integration for that step. Before interpreting visibility as production shadows, establish culling, clipping and alpha policy.
+1. **Sunrise transient:** user observed sun shadows appear, nearly disappear and stabilize seconds later. User-provided research suggests MM CURRENT_TIME, skyboxTime, light-setting/RGB transitions and sun elevation are not fully synchronized. Plausible cause only, not a verified diagnosis. Run2's narrow matching-direction/receiver path also remains part of the system to examine later; no causal attribution is established here.
+2. **Camera/view transient:** at least one camera movement into/behind nearby geometry temporarily collapsed shadows, then recovered. This is distinct from the sunrise report. No diagnosis or fix attempted.
+3. **Coverage/art direction:** user finds many interiors without meaningful direct light and some open/open-roof areas behaving unlike normal sunlit scenes. A visible sky/opening alone does not prove a matching authored directional contribution or participation in the current subset. Do not label these all as one bug.
+
+No further broad validation or renderer feature work is authorized by this handoff. `docs/RT_LIGHTING_VISION.md` records proposed future visual priorities separately from these implementation facts.
