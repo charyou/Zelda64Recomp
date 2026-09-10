@@ -97,3 +97,13 @@
 **Why:** Visible Town diagnostics showed that the initial draw-wide normal-length gate rejected large surfaces. Per-vertex magnitude transport preserves the shading information that motivated the gate and removes its coarse fallback without batch splitting. Draw-local alpha/fog and combiner/blender behavior remain intact. HFR uses the renderer's already interpolated matrices. The added scalar varying passed the current Vulkan runtime check; this does not qualify D3D12 runtime or supersede atmospheric camera constraints.
 
 **Consequences:** Lighting is independently selectable from fog. Future positional lighting or shadows must preserve the current fallback rather than silently dropping unsupported lights. New vertex system inputs and RDP layout changes still require synchronized shader builds and runtime API checks. See `docs/PER_PIXEL_LIGHTING.md` for eligibility and integration details.
+
+## ADR-008 — Hardware RT starts with isolated primary-hit visibility
+
+**Status:** Accepted for the experimental Vulkan developer path, 2026-09-09
+
+**Decision:** RT64 owns a minimal per-framebuffer RT resource owner using Plume's existing BLAS/TLAS, pipeline, SBT and trace APIs. Rebuild a world-space BLAS from conservative executable opaque indexed ranges and the existing presentation-time world-position buffer, then use an identity TLAS instance. The first consumer is a visible primary-hit inset with a separate descriptor/push-constant ABI. Preserve all normal raster draws and Native behavior; do not enable the incomplete legacy `RT_ENABLED` renderer or change raster-stage linkage to establish this foundation.
+
+**Why:** This delivered observable hardware intersections on real Town/Link geometry without restoring historical DI/GI/denoiser classes or touching the fragile lighting/fog ABI. Backend AS correctness repairs belong in the nested Plume source. The initial Vulkan multi-geometry range bug demonstrates that surviving API declarations alone are not runtime proof.
+
+**Consequences:** This diagnostic's double-sided, single-projection, opaque subset is not a production shadow contract. Alpha, clipping, culling, receiver semantics and caching remain separate work. Keep the primary-hit view as a regression reference for the next visibility consumer. Vulkan runtime is confirmed; D3D12, MSAA and broad HFR/scene-transition behavior remain unqualified. See `docs/RAYTRACING_FOUNDATION.md` for the exact implementation and evidence.

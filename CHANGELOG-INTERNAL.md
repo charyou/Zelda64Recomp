@@ -4,6 +4,14 @@
 > Einträge, die älter als 3–4 Sessions sind, werden zu Kurzfassungen kompaktiert.
 > Details stehen dann nur noch in der Git-History beziehungsweise den verlinkten Projektdokumenten.
 
+## 2026-09-09 — Hardware RT primary-hit foundation, Vulkan runtime proof
+
+- Implemented RT64 `RaytracingDebug` using the existing HFR world-position/index buffers, conservative executable opaque ranges, world-space BLAS, identity TLAS, isolated descriptors, a minimal raygen/miss/closest-hit library, SBT, real `traceRays` and a visible barycentric-hit inset. `RT64_RT_PRIMARY_HIT=1` opts in; the existing RayTracing shortcut shares its state. No legacy `RT_ENABLED` restoration, raster linkage change, MM/runtime patch, or upstream archaeology.
+- Corrected generic nested Plume Vulkan AS contracts: per-geometry BLAS build ranges, scratch alignment, consistent TLAS flags and actual AS device address. Initial runtime encountered device loss; user noted preexisting driver instability. A definite aggregate-range bug was independently found and fixed; do not attribute the driver crash solely from timing.
+- Final Clang/LLD build and actual DXIL/SPIR-V/wrapper generation passed. Vulkan RX 9070 XT Town/save `a` visibly showed architecture, ground and animated Link in the RT inset. Relaunching the same binary with RT off restored coherent Enhanced output. F2 injection did not visibly toggle; launch-time A/B was used. Corrected run had no further device-loss errors or obvious severe corruption. No validation-layer run, D3D12 runtime, MSAA, broad HFR/scene-transition or performance qualification.
+- Executable SHA `925F6959DD675608C9A14FEC5739B6A47DCA51D0896C0FC38A21DC6D7C6068BC`. Evidence: `_working-directory/diagnostics/2026-09-09-rt/`, including on/off captures, build log and reproducible launcher using the existing copied profile. Test processes stopped and copied seed restored. Native/lighting/fog baseline and parked cutout experiment preserved.
+- Updated `HANDOFF.md`, added `docs/RAYTRACING_FOUNDATION.md` and ADR-008. The generated `CHANGELOG.md` is unchanged: this run delivers an opt-in developer diagnostic, not a normal release-facing lighting feature. Changes remain uncommitted in parent, RT64 and nested Plume; preserve all three layers. Next: a directional visibility ray within the debug pipeline, retaining primary-hit reference mode.
+
 ## 2026-09-09 — Broader semantic per-pixel lighting coverage
 
 - Visible Town tint diagnostics identified the whole-draw normal-length restriction as the major avoidable environment rejection. Short/zero/varying normals now retain per-vertex strength through a scalar varying; the shader normalizes direction separately. No draw splitting or authored-color relighting.

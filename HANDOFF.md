@@ -1,71 +1,64 @@
 # Handoff
 
-> Current state: 2026-09-09. Focused lighting-coverage pass completed after restart; no further shadow/cutout investigation was performed.
+> Current state: 2026-09-09. Hardware RT primary-hit vertical slice implemented and visibly validated on Vulkan. Stop at this foundation; production lighting is separate work.
 
 ## Current deliverable
 
-- Branch: `codex/rt64-modern-fog`. This continuation's changes are uncommitted; prior submodule changes and the user's AGENTS edit are preserved.
+- Parent work branch: `codex/rt64-raytracing`, base HEAD `ef88a580f28776ae8a984a151bfa17178a9e2d7c`.
+- RT64 work branch: `codex/raytracing`, base HEAD `cfbe357c82c6b7611f46d5252e89b97333d1d0ed`.
+- Changes are uncommitted in the parent, RT64, and **RT64's nested `src/contrib/plume` submodule**. Commit/preserve all three layers when checkpointing. No submodule resets or upstream updates occurred. Prepared research and `lib/rt64 und md files.zip` were already untracked and are preserved.
 - Executable: `_working-directory/build-zelda-validation/Zelda64Recompiled.exe`.
-- SHA-256: `7C3637B5034E3D30C6D6D06DEF66850AD288070663562949E1AA200A2D65E59A`.
-- Isolated interactive launcher: `_working-directory/diagnostics/2026-09-07-coverage/Launch-Lighting.cmd`. Press Start Game normally. This selects the updated executable/profile, clears playback/tints and disables the parked cutout-AA experiment.
-- Expanded per-pixel coverage preserves authored normal magnitude per vertex, including zero/short normals. Large Town wall/ground sections no longer fall back because of another vertex's magnitude.
-- Equivalent light values can use different buffer indices. Shared-matrix draws evaluate the original local directional-light equation, supporting nonuniform scale/shear. Mixed transforms still need a compatible common basis.
-- Fog and camera-publication behavior were not changed in this continuation.
+- SHA-256: `925F6959DD675608C9A14FEC5739B6A47DCA51D0896C0FC38A21DC6D7C6068BC`.
+- Isolated runtime copy: `_working-directory/diagnostics/2026-09-07-coverage/runtime/rt-primary-hit.exe`.
+- Launch with `RT64_RT_PRIMARY_HIT=1` for the cyan-bordered upper-left primary-hit inset. Without it, normal Enhanced rendering remains the default. The existing F2 / `DeveloperShortcut::RayTracing` route is wired to the same state, but keyboard injection did not visibly toggle it during this test; use launch-time A/B for reproducible validation.
 
-## Lighting behavior and remaining boundaries
+## Required implementation handoff
 
-Read `docs/PER_PIXEL_LIGHTING.md` and ADR-007. F1 Lighting and `ZELDA64RECOMP_LIGHTING=original` remain the normal A/B controls. Native always uses original shade RGB.
+Read **`docs/RAYTRACING_FOUNDATION.md`** for exact files/symbols, geometry gates, resource lifetimes, shader bindings/SBT, backend fixes, commands, hashes, failures and runtime evidence. ADR-008 records the durable decision.
 
-- The dominant visible rejection in Town was the old draw-wide normal-length gate, including very short/zero normals. A temporary gate-relaxation experiment exposed this; correct per-vertex magnitude transport replaced the gate rather than forcing a draw-wide average.
-- Spatial diagnostics showed Clock Tower interior walls/floor blue while characters were green. These surfaces lack a supported RSP light set and retain authored shading. Do not invent normals or reinterpret RGB to force them into diffuse lighting.
-- Genuine mixed light/color state and unsupported mixed transforms still fall back per draw. Representative Town logs did not show mixed-state rejection dominating; no batch splitting was added.
-- True positional lights still need pixel world position and transform scale to preserve the original anisotropic distance, diffuse clamp and wrapped attenuation. Existing directional-resolved MM point lights work. No new MM function patches or identity gates were added.
-- `RT64_LIGHTING_COVERAGE=1` tints visible surfaces; `RT64_LIGHTING_DIAGNOSTICS=1` logs fallback categories. Temporary aggressive/conservative switches were removed.
-- The scalar normal magnitude adds `TEXCOORD1`; dynamic/specialized SPIR-V and generated DXIL wrappers were rebuilt together. RDPParams remains 336 bytes; `pixelLighting.z` now selects a shared local matrix or the rotated basis.
+The thesis held: reuse Plume and the surviving Workload/framebuffer insertion points; reconstruct only a small RT64 owner and minimal RT shader library. `RT_ENABLED` remains undefined/disabled. No legacy DI/GI restoration, alternative backend abstraction, CPU geometry upload or raster world-position varying.
 
-## Validation and evidence
+Actual flow:
 
-Evidence remains in `_working-directory/diagnostics/2026-09-07-coverage/` (created before the restart).
+```text
+Workload + current/HFR transforms and velocity
+-> existing VertexProcessor / RSPWorldCS worldPosBuffer
++ faceIndicesBuffer / supported executable indexed draw ranges
+-> multi-geometry world-space BLAS
+-> identity TLAS
+-> isolated SceneBVH descriptor / PrimaryHitRT pipeline / SBT
+-> traceRays
+-> barycentric hit / dark-miss RGBA8 texture
+-> target-matched raster copy into Enhanced inset
+-> normal resolve / presentation
+```
 
-- Targeted project-local Clang/LLD build passed, with actual DXIL/SPIR-V generation. Final Vulkan runs had no shader-sorting/error messages in stderr.
-- Town intro spatial captures: `captures/town-conservative-tint.jpg` shows extensive yellow normal rejection; `town-expanded-tint.jpg` shows the previously rejected environment enhanced. Early captures predate the shared-matrix refinement.
-- Final untinted Town enhanced/original launches and a Native/RDRAM Town smoke check rendered coherently; captures are not frame-matched and do not establish pixel-exact equivalence. Legacy inn view also remained clean. F1 automation was unreliable, so launch-time lighting A/B was used.
-- Representative final Town diagnostic: 263 eligible / 86 set fallbacks, no mixed/transform/positional rejection at that sampled view. This supports the spatial observation, not a global coverage percentage.
-- Copied real profile: 44 `.nrm` and one `.rtz` archive. No mod-loading crash or obvious missing/corrupted geometry/materials observed. This is a stack smoke test, not exhaustive mod qualification.
-- Actual backend Vulkan; DXIL compiled but D3D12 runtime remains unqualified. Cutout AA was explicitly disabled throughout this continuation.
-- Test processes stopped and copied seed restored. Source user-profile save remains SHA-256 `B12F0C6F5546C59DF8E9CD26970A81F8F7CD11803E9F7D4E2E13E6D03D8D1C9B`.
+Eligibility is semantic: one perspective projection per framebuffer, indexed opaque depth-tested/depth-writing triangles, no alpha-compare/coverage-alpha/framebuffer alpha blend, no VertexTestZ-rewritten indices. Unsupported content keeps its raster rendering. BLAS/TLAS rebuild each enabled replay from presentation-time world positions; unmatched frames now request the same existing world processor. No actor/scene/mod identities. The debug TLAS is deliberately double-sided, and the diagnostic depth interval is NDC 0 to 0.99; this is not full raster clipping or a production shadow material policy.
 
-## Important build correction discovered by the experiment
+Plume fixes: per-geometry Vulkan BLAS ranges instead of an erroneous single aggregate range, queried scratch alignment, consistent TLAS query/build flags, and optional AS-object reference for Vulkan's actual AS device address. These live in the nested Plume submodule.
 
-**Bundled DXC `-MD` writes dependencies only, without compiling a shader object.** The preceding dependency fix therefore logged shader generation while leaving old binaries intact. The first new-layout lighting candidate paired CPU RDP336 with stale shader RDP320 and rendered corrupted geometry even with lighting disabled.
+## Validation completed; do not broaden this run
 
-RT64 CMake now compiles first, then invokes a separate `-M -MF` dependency pass. All shader objects were genuinely regenerated. The earlier claim that unchanged shader hashes validated dependency tracking was insufficient and is superseded by the new source-change probe.
+- Documented project-local Clang 19.1.3/LLD/Ninja build passed via `pwsh -NoProfile -ExecutionPolicy Bypass -File _working-directory/diagnostics/2026-09-06/build-control.ps1`.
+- New RT DXIL/SPIR-V and C/header wrappers actually generated. No raster ABI or raster shader sources changed. Build log: `_working-directory/diagnostics/2026-09-09-rt/build-address.log`.
+- Vulkan on AMD Radeon RX 9070 XT, save `a` in Town, copied real mod profile, per-pixel lighting + Atmospheric fog, cutout-AA explicitly disabled. `run-rt.ps1` in that evidence directory restores the copied seed and uses the existing finite Town playback.
+- `primary-hit-town.png`: real ray intersections visibly reconstruct Town architecture, ground and animated Link inside the inset. Logs confirm hardware pipeline, 256-byte SBT, BLAS/TLAS and `traceRays`. The first logged 4-mesh/96-triangle count is an early title submission, not the Town geometry count.
+- `baseline-off-town.png`: same binary relaunched with `run-rt.ps1 -Name baseline-off -Off`; normal Enhanced rendering restored without RT initialization. Captures are not frame-matched. No severe visible corruption or device-loss errors in the corrected focused run.
+- Initial candidate encountered Vulkan device loss and the user reported a driver crash with known preexisting instability. The crash alone does not prove attribution, but a concrete backend multi-geometry AS range defect was found and repaired. Do not reuse the initial `rt-on` candidate as a working result.
+- Native screenshot helper crashed once; reset/rebind recovered it. Sandboxed launches were not targetable; the documented interactive desktop launch worked. See `docs/RUNTIME_VALIDATION.md` and the computer-use skill.
+- No validation-layer-enabled run. D3D12 backend and DXIL compiled, but D3D12 runtime, MSAA, broad scene transitions, HFR edge cases and performance remain unqualified. No `bastian` scene tour.
+- Test game processes stopped; copied seed save restored. Source profile was not used for game writes. Seed SHA remains `B12F0C6F5546C59DF8E9CD26970A81F8F7CD11803E9F7D4E2E13E6D03D8D1C9B`.
 
-- `validate-dxc-outputs.ps1` proves fresh DXIL/SPIR-V objects exist, nested includes enter the depfile, dependency generation preserves the object, and changing an included constant changes both binary hashes.
-- Reflection verifies SV_VertexID and 336-byte RDP parameters in the actual compiled VS.
-- Targeted no-op shader builds report no work.
-- Dynamic light loops also exposed re-spirv's cyclic-graph limitation. Final code explicitly unrolls the seven possible directional lights; no generic optimizer rewrite was needed.
+## Baseline constraints retained
 
-The prior generated patch-registration dependency fix remains in place. Base-ROM generation still uses the corrected runtime recompiler; patch generation uses CI-pinned `a13e5cff...`. Generated patch sources are shared: do not build different patch candidates concurrently.
+Read `docs/PER_PIXEL_LIGHTING.md` and ADR-007. Authored normal magnitude, equivalent light values and shared-matrix lighting remain in place. Genuine mixed lights/transforms and true positional microcode lights still fall back. Normal magnitude remains `TEXCOORD1`; RDPParams is 336 bytes. F1 Lighting and `ZELDA64RECOMP_LIGHTING=original` remain the lighting A/B controls. Native uses original shading.
 
-## Atmosphere
+**Shader build correction remains critical:** bundled DXC `-MD` emits dependencies only, not objects. Current CMake compiles first, then runs a separate `-M -MF` dependency pass. Never infer regenerated shader binaries from a logged generation step alone. Earlier RDP320/336 mismatches caused severe corruption. Dynamic directional-light cases remain explicitly unrolled for re-spirv compatibility.
 
-Original remains the persistent fog default and Native reference. Faithful and Atmospheric retain their prior camera/signature safety gates and authored optical-depth design. The user has manually tested the atmospheric look extensively; do not turn the next run into another broad fog qualification exercise without new evidence.
+Modern fog/camera behavior is unchanged. Original remains the persistent fog default; Faithful/Atmospheric retain their semantic camera/signature gates. Preserve ADR-006's withdrawal of camera-basis publication. Water influence and conservative skyless atmosphere remain intact. Do not repeat atmosphere research or qualification without new evidence.
 
-Water influence uses actual active static/dynamic collision water boxes, room/disabled-owner rules, nearby surface area and altitude. It blends toward the existing 0.65 wet-air transmittance target without hardcoded Swamp constants or changing MM weather. Missing water semantics contribute zero; overlapping custom boxes can overestimate the bounded influence. The masked event appends `waterInfluence`, preserving older field offsets; see `docs/MODERN_FOG_MODDING.md`.
+The parked cutout-MSAA prototype is still unqualified and defaults on for eligible MSAA draws; validation explicitly used `RT64_CUTOUT_AA=original`. Previous local launcher and evidence remain in `2026-09-07-coverage`. Historical good/bad build oracles are preserved; `_working-directory/build-zelda-clang` remains the bad historical oracle. Base-ROM generation uses the corrected runtime recompiler; patch generation uses the documented CI-pinned tool. Do not run competing patch candidates concurrently.
 
-Automatic skyless views use 15% optical strength with a minimum 10,000-unit distance scale. Short rooms receive negligible additional haze; authored fog still wins by maximum optical depth. Explicit mod FORCE_OFF remains zero. Indoor art direction and water-only dry-weather strength were not separately calibrated at runtime.
+## Immediate next coding step
 
-## Runtime/build workflow
-
-Read `docs/RUNTIME_VALIDATION.md`. Native `node_repl` + `@oai/sky` works; browser CUA alone has no native support. Launch the interactive game with explicit CWD and Normal window style on the interactive desktop. Hidden launches were not targetable. Rebind/activate the returned window before capture; occluding windows can otherwise contaminate captures. Keyboard injection is unreliable; opt-in finite controller playback is the reproducible fallback.
-
-Use `pwsh -NoProfile -ExecutionPolicy Bypass -File _working-directory/diagnostics/2026-09-06/build-control.ps1`. Windows PowerShell 5 with terminating native-stderr handling stopped on a CMake deprecation warning; PowerShell 7 works. The recipe initializes VS, LLVM 19.1.3, local tools/SDL and Windows SDK `mt.exe`.
-
-Historical good/bad oracles remain intact. `_working-directory/build-zelda-clang/Zelda64Recompiled.exe` is still the bad historical oracle, not the deliverable. Historical geometry evidence remains in `docs/GRAPHICS_REGRESSION_HANDOFF.md`. Disk shortage from the preceding run is no longer a blocker.
-
-## Parked side work
-
-Before the restart, shadow inspection found that MM foot shadows already use light directions/floor collision. Projected mesh shadows need caster/receiver semantics and an overlap-safe mask/composite pass; no shadow implementation was delivered. Preserve that finding for a focused task.
-
-The earlier cutout-MSAA prototype remains in the working tree, unvalidated and unchanged during this continuation. Details: `_working-directory/diagnostics/2026-09-07-cutout/experiment.md`. Its current source defaults on for eligible MSAA draws; the lighting launcher explicitly sets `RT64_CUTOUT_AA=original` to isolate it. Do not treat it as a qualified release feature. No further work on it is required for this lighting pass.
+Preserve this working primary-hit reference. Add a second **debug** visibility ray toward an existing directional RSP light at a primary hit, reusing the same TLAS/pipeline/output. Production shadows must first resolve culling, clipping, alpha and receiver semantics; GI, reflections, denoising and object-space caching are not prerequisites.
