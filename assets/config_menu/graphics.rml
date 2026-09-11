@@ -308,12 +308,96 @@
                         <div class="config-option__list">
                             <input type="radio" name="rt-shadows" data-checked="rt_shadows" value="Off" id="rt_shadows_off"
                                 data-event-blur="set_cur_config_index(-1)" data-event-focus="set_cur_config_index(8)"
-                                style="nav-up: #fog_original; nav-down: #apply_button" />
+                                style="nav-up: #fog_original; nav-down: #rt_ao_off" />
                             <label class="config-option__tab-label" for="rt_shadows_off">Off</label>
                             <input type="radio" name="rt-shadows" data-checked="rt_shadows" value="On" id="rt_shadows_on"
                                 data-event-blur="set_cur_config_index(-1)" data-event-focus="set_cur_config_index(8)"
-                                style="nav-up: #fog_atmospheric; nav-down: #apply_button" />
+                                style="nav-up: #fog_atmospheric; nav-down: #rt_ao_on" />
                             <label class="config-option__tab-label" for="rt_shadows_on">On (Experimental)</label>
+                        </div>
+                    </div>
+
+                    <div class="config-option" data-event-mouseover="set_cur_config_index(9)">
+                        <label class="config-option__title">RT AO / Contact Grounding</label>
+                        <div class="config-option__list">
+                            <input type="radio" name="rt-ao" data-checked="rt_ao" value="Off" id="rt_ao_off"
+                                data-event-blur="set_cur_config_index(-1)" data-event-focus="set_cur_config_index(9)"
+                                style="nav-up: #rt_shadows_off; nav-down: #rt_ao_radius" />
+                            <label class="config-option__tab-label" for="rt_ao_off">Off</label>
+                            <input type="radio" name="rt-ao" data-checked="rt_ao" value="On" id="rt_ao_on"
+                                data-event-blur="set_cur_config_index(-1)" data-event-focus="set_cur_config_index(9)"
+                                style="nav-up: #rt_shadows_on; nav-down: #rt_ao_radius" />
+                            <label class="config-option__tab-label" for="rt_ao_on">On (Experimental)</label>
+                        </div>
+                    </div>
+
+                    <div class="config-option" data-event-mouseover="set_cur_config_index(10)">
+                        <label class="config-option__title">AO Spatial Tuning</label>
+                        <div class="config-option__range-wrapper config-option__list">
+                            <label class="config-option__range-label">Radius: {{rt_ao_radius}}</label>
+                            <input id="rt_ao_radius" type="range" min="1" max="160" step="1" data-value="rt_ao_radius"
+                                style="flex:1;margin: 0dp;nav-up:#rt_ao_off;nav-down:#rt_ao_strength;" />
+                        </div>
+                        <div class="config-option__range-wrapper config-option__list">
+                            <label class="config-option__range-label">Strength: {{rt_ao_strength}}</label>
+                            <input id="rt_ao_strength" type="range" min="0" max="1" step="0.01" data-value="rt_ao_strength"
+                                style="flex:1;margin: 0dp;nav-up:#rt_ao_radius;nav-down:#rt_environment_off;" />
+                        </div>
+                    </div>
+
+                    <div class="config-option" data-event-mouseover="set_cur_config_index(11)">
+                        <label class="config-option__title">RT Environment / Skylight Fill</label>
+                        <div class="config-option__list">
+                            <input type="radio" name="rt-environment-fill" data-checked="rt_environment_fill" value="Off" id="rt_environment_off"
+                                data-event-blur="set_cur_config_index(-1)" data-event-focus="set_cur_config_index(11)"
+                                style="nav-up: #rt_ao_strength; nav-down: #rt_environment_radius" />
+                            <label class="config-option__tab-label" for="rt_environment_off">Off</label>
+                            <input type="radio" name="rt-environment-fill" data-checked="rt_environment_fill" value="On" id="rt_environment_on"
+                                data-event-blur="set_cur_config_index(-1)" data-event-focus="set_cur_config_index(11)"
+                                style="nav-up: #rt_ao_strength; nav-down: #rt_environment_radius" />
+                            <label class="config-option__tab-label" for="rt_environment_on">On (Experimental)</label>
+                        </div>
+                    </div>
+
+                    <div class="config-option" data-event-mouseover="set_cur_config_index(12)">
+                        <label class="config-option__title">Environment Spatial Tuning</label>
+                        <div class="config-option__range-wrapper config-option__list">
+                            <label class="config-option__range-label">Radius: {{rt_environment_radius}}</label>
+                            <input id="rt_environment_radius" type="range" min="32" max="1000" step="1" data-value="rt_environment_radius"
+                                style="flex:1;margin: 0dp;nav-up:#rt_environment_off;nav-down:#rt_environment_strength;" />
+                        </div>
+                        <div class="config-option__range-wrapper config-option__list">
+                            <label class="config-option__range-label">Strength: {{rt_environment_strength}}</label>
+                            <input id="rt_environment_strength" type="range" min="0" max="1" step="0.01" data-value="rt_environment_strength"
+                                style="flex:1;margin: 0dp;nav-up:#rt_environment_radius;nav-down:#rt_spatial_samples;" />
+                        </div>
+                    </div>
+
+                    <div class="config-option" data-event-mouseover="set_cur_config_index(13)">
+                        <label class="config-option__title">Spatial Sampling</label>
+                        <div class="config-option__range-wrapper config-option__list">
+                            <label class="config-option__range-label">Samples: {{rt_spatial_samples}}</label>
+                            <input id="rt_spatial_samples" type="range" min="4" max="32" step="1" data-value="rt_spatial_samples"
+                                style="flex:1;margin: 0dp;nav-up:#rt_environment_strength;nav-down:#rt_spatial_bias;" />
+                        </div>
+                        <div class="config-option__range-wrapper config-option__list">
+                            <label class="config-option__range-label">Bias: {{rt_spatial_bias}}</label>
+                            <input id="rt_spatial_bias" type="range" min="0.01" max="1" step="0.01" data-value="rt_spatial_bias"
+                                style="flex:1;margin: 0dp;nav-up:#rt_spatial_samples;nav-down:#rt_authored_fill_budget;" />
+                        </div>
+                    </div>
+
+                    <div class="config-option" data-event-mouseover="set_cur_config_index(14)">
+                        <label class="config-option__title">Authored Fill Tuning</label>
+                        <div class="config-option__range-wrapper config-option__list">
+                            <label class="config-option__range-label">Fill Budget: {{rt_authored_fill_budget}}</label>
+                            <input id="rt_authored_fill_budget" type="range" min="0" max="0.6" step="0.01" data-value="rt_authored_fill_budget"
+                                style="flex:1;margin: 0dp;nav-up:#rt_spatial_bias;nav-down:#rt_ambient_floor;" />
+                        </div>
+                        <div class="config-option__range-wrapper config-option__list">
+                            <label class="config-option__range-label">Ambient Floor: {{rt_ambient_floor}}</label>
+                            <input id="rt_ambient_floor" type="range" min="0.2" max="1" step="0.01" data-value="rt_ambient_floor"
+                                style="flex:1;margin: 0dp;nav-up:#rt_authored_fill_budget;nav-down:#apply_button;" />
                         </div>
                     </div>
 
@@ -358,6 +442,24 @@
                     <p data-if="cur_config_index == 8">
                         Adds experimental hard sunlight shadows to supported opaque surfaces. Requires a ray-tracing-capable GPU and per-pixel lighting. Some surfaces and effects retain their original lighting. May reduce performance.
                     </p>
+                    <p data-if="cur_config_index == 9">
+                        Adds experimental ray-traced ambient occlusion with spatial contact grounding on supported opaque Enhanced geometry. Uses bounded authored ambient and fill; may reduce performance.
+                    </p>
+                    <p data-if="cur_config_index == 10">
+                        Adjusts the AO spatial radius and strength used for contact grounding.
+                    </p>
+                    <p data-if="cur_config_index == 11">
+                        Adds experimental environment and skylight fill using the resolved environment palette and finite enclosure. This is bounded authored fill, not global illumination.
+                    </p>
+                    <p data-if="cur_config_index == 12">
+                        Adjusts the environment fill spatial radius and strength.
+                    </p>
+                    <p data-if="cur_config_index == 13">
+                        Adjusts shared spatial sample count and bias for the enhanced ray-traced effects.
+                    </p>
+                    <p data-if="cur_config_index == 14">
+                        Adjusts the authored fill budget and ambient floor used by enhanced environment lighting.
+                    </p>
                 </div>
             </div>
             <div class="config__footer">
@@ -370,7 +472,7 @@
                         data-attrif-disabled="!options_changed"
                         onclick="apply_options"
                         id="apply_button"
-                        style="nav-up:#rt_shadows_off"
+                        style="nav-up:#rt_ambient_floor"
                     >
                         <div class="button__label">Apply<span class="prompt-font-sm">{{gfx_help__apply}}</span></div>
                     </button>

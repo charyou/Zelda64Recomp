@@ -214,6 +214,13 @@ RECOMP_PATCH void Play_Main(GameState* thisx) {
             .clearAirFarTransmittance = atmosphereOverride.clearAirFarTransmittance,
             .wetAirFarTransmittance = atmosphereOverride.wetAirFarTransmittance,
             .waterInfluence = atmosphereOverride.waterInfluence,
+            // Resolved post-adjustment ambient already includes authored zones/weather.
+            .ambientRGB = ((u32)this->lightCtx.ambientColor[0] << 16) |
+                ((u32)this->lightCtx.ambientColor[1] << 8) | this->lightCtx.ambientColor[2],
+            // Presentation evidence shapes a lobe, never asserts geometric sky access.
+            // Skyless rooms retain isotropic authored room fill.
+            .skyFillWeight = naturalSky &&
+                this->roomCtx.curRoom.behaviorType1 == ROOM_BEHAVIOR_TYPE1_0 ? 1.0f : 0.0f,
         };
         recomp_set_environment_fog(&fog);
     }

@@ -233,6 +233,16 @@ void set_application_user_config(RT64::Application* application, const ultramode
     application->setFogMode(to_rt64(config.fog_option));
     if (application->workloadQueue) {
         application->workloadQueue->rtShadows = config.rt_shadows;
+        application->workloadQueue->rtAO = config.rt_ao;
+        application->workloadQueue->rtEnvironmentFill = config.rt_environment_fill;
+        application->workloadQueue->aoRadius = config.rt_ao_radius;
+        application->workloadQueue->aoStrength = config.rt_ao_strength;
+        application->workloadQueue->environmentRadius = config.rt_environment_radius;
+        application->workloadQueue->environmentStrength = config.rt_environment_strength;
+        application->workloadQueue->spatialSamples = config.rt_spatial_samples;
+        application->workloadQueue->spatialBias = config.rt_spatial_bias;
+        application->workloadQueue->authoredFillBudget = config.rt_authored_fill_budget;
+        application->workloadQueue->ambientFloor = config.rt_ambient_floor;
     }
 }
 
@@ -375,8 +385,27 @@ zelda64::renderer::RT64Context::RT64Context(uint8_t* rdram, ultramodern::rendere
     }
 
     // Persistent setting, with an explicit launch override for finite diagnostics.
+    const char* fillOverride = std::getenv("RT64_RT_ENVIRONMENT_FILL");
+    app->workloadQueue->rtEnvironmentFill = fillOverride ? std::strcmp(fillOverride, "1") == 0 : cur_config.rt_environment_fill;
+    app->workloadQueue->aoRadius = cur_config.rt_ao_radius;
+    app->workloadQueue->aoStrength = cur_config.rt_ao_strength;
+    app->workloadQueue->environmentRadius = cur_config.rt_environment_radius;
+    app->workloadQueue->environmentStrength = cur_config.rt_environment_strength;
+    app->workloadQueue->spatialSamples = cur_config.rt_spatial_samples;
+    app->workloadQueue->spatialBias = cur_config.rt_spatial_bias;
+    app->workloadQueue->authoredFillBudget = cur_config.rt_authored_fill_budget;
+    app->workloadQueue->ambientFloor = cur_config.rt_ambient_floor;
+    const char* aoOverride = std::getenv("RT64_RT_AO");
+    app->workloadQueue->rtAO = aoOverride ? std::strcmp(aoOverride, "1") == 0 : cur_config.rt_ao;
     const char* shadowOverride = std::getenv("RT64_RT_SHADOWS");
     app->workloadQueue->rtShadows = shadowOverride ? std::strcmp(shadowOverride, "1") == 0 : cur_config.rt_shadows;
+
+    // Same inspector as F1, available when OS function-key injection is unreliable.
+    if (const char* inspector = std::getenv("ZELDA64RECOMP_DEV_INSPECTOR")) {
+        if (std::strcmp(inspector, "1") == 0) {
+            app->processDeveloperShortcut(RT64::Application::DeveloperShortcut::Inspector);
+        }
+    }
 
     // Same presentation switch as F3, available without OS keyboard injection.
     // A new application starts with viewRDRAM=false; apply this once after setup.
@@ -428,6 +457,11 @@ void zelda64::renderer::RT64Context::send_dl(const OSTask* task) {
     const EnvironmentFog environment = get_environment_fog();
     RT64::AtmosphereParameters atmosphere{};
     atmosphere.valid = environment.valid;
+    atmosphere.environmentFill = {
+        ((environment.ambient_rgb >> 16) & 255) / 255.0f,
+        ((environment.ambient_rgb >> 8) & 255) / 255.0f,
+        (environment.ambient_rgb & 255) / 255.0f,
+        std::clamp(environment.sky_fill_weight, 0.0f, 1.0f) };
     atmosphere.fogColor = hlslpp::float4(
         environment.red / 255.0f,
         environment.green / 255.0f,

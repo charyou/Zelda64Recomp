@@ -103,6 +103,16 @@ namespace ultramodern {
             {"hpfb_option",     config.hpfb_option},
             {"fog_option",      config.fog_option},
             {"rt_shadows",      config.rt_shadows},
+            {"rt_ao",           config.rt_ao},
+            {"rt_environment_fill", config.rt_environment_fill},
+            {"rt_ao_radius", config.rt_ao_radius},
+            {"rt_ao_strength", config.rt_ao_strength},
+            {"rt_environment_radius", config.rt_environment_radius},
+            {"rt_environment_strength", config.rt_environment_strength},
+            {"rt_spatial_samples", config.rt_spatial_samples},
+            {"rt_spatial_bias", config.rt_spatial_bias},
+            {"rt_authored_fill_budget", config.rt_authored_fill_budget},
+            {"rt_ambient_floor", config.rt_ambient_floor},
             {"rr_manual_value", config.rr_manual_value},
             {"developer_mode",  config.developer_mode},
         };
@@ -120,6 +130,16 @@ namespace ultramodern {
         config.hpfb_option      = from_or_default(j, "hpfb_option",     hpfb_default);
         config.fog_option       = from_or_default(j, "fog_option",      fog_default);
         config.rt_shadows       = from_or_default(j, "rt_shadows",      false);
+        config.rt_ao            = from_or_default(j, "rt_ao",           false);
+        config.rt_environment_fill = from_or_default(j, "rt_environment_fill", false);
+        config.rt_ao_radius = from_or_default(j, "rt_ao_radius", 45.00f);
+        config.rt_ao_strength = from_or_default(j, "rt_ao_strength", 0.80f);
+        config.rt_environment_radius = from_or_default(j, "rt_environment_radius", 300.00f);
+        config.rt_environment_strength = from_or_default(j, "rt_environment_strength", 0.40f);
+        config.rt_spatial_samples = from_or_default(j, "rt_spatial_samples", 12.00f);
+        config.rt_spatial_bias = from_or_default(j, "rt_spatial_bias", 0.10f);
+        config.rt_authored_fill_budget = from_or_default(j, "rt_authored_fill_budget", 0.45f);
+        config.rt_ambient_floor = from_or_default(j, "rt_ambient_floor", 0.35f);
         config.rr_manual_value  = from_or_default(j, "rr_manual_value", rr_manual_default);
         config.developer_mode   = from_or_default(j, "developer_mode",  developer_mode_default);
     }
@@ -356,6 +376,16 @@ void reset_graphics_options() {
     new_config.hpfb_option = hpfb_default;
     new_config.fog_option = fog_default;
     new_config.rt_shadows = false;
+    new_config.rt_ao = false;
+    new_config.rt_environment_fill = false;
+    new_config.rt_ao_radius = 45.00f;
+    new_config.rt_ao_strength = 0.80f;
+    new_config.rt_environment_radius = 300.00f;
+    new_config.rt_environment_strength = 0.40f;
+    new_config.rt_spatial_samples = 12.00f;
+    new_config.rt_spatial_bias = 0.10f;
+    new_config.rt_authored_fill_budget = 0.45f;
+    new_config.rt_ambient_floor = 0.35f;
     new_config.rr_manual_value = rr_manual_default;
     new_config.developer_mode = developer_mode_default;
     ultramodern::renderer::set_graphics_config(new_config);

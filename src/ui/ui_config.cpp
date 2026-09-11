@@ -624,6 +624,42 @@ public:
         bind_option(constructor, "msaa_option", &new_options.msaa_option);
         bind_option(constructor, "rr_option", &new_options.rr_option);
         bind_option(constructor, "fog_option", &new_options.fog_option);
+        constructor.BindFunc("rt_ao_radius",
+            [](Rml::Variant& out) { out = new_options.rt_ao_radius; },
+            [](const Rml::Variant& in) { new_options.rt_ao_radius = in.Get<float>(); graphics_model_handle.DirtyVariable("options_changed"); });
+        constructor.BindFunc("rt_ao_strength",
+            [](Rml::Variant& out) { out = new_options.rt_ao_strength; },
+            [](const Rml::Variant& in) { new_options.rt_ao_strength = in.Get<float>(); graphics_model_handle.DirtyVariable("options_changed"); });
+        constructor.BindFunc("rt_environment_radius",
+            [](Rml::Variant& out) { out = new_options.rt_environment_radius; },
+            [](const Rml::Variant& in) { new_options.rt_environment_radius = in.Get<float>(); graphics_model_handle.DirtyVariable("options_changed"); });
+        constructor.BindFunc("rt_environment_strength",
+            [](Rml::Variant& out) { out = new_options.rt_environment_strength; },
+            [](const Rml::Variant& in) { new_options.rt_environment_strength = in.Get<float>(); graphics_model_handle.DirtyVariable("options_changed"); });
+        constructor.BindFunc("rt_spatial_samples",
+            [](Rml::Variant& out) { out = new_options.rt_spatial_samples; },
+            [](const Rml::Variant& in) { new_options.rt_spatial_samples = in.Get<float>(); graphics_model_handle.DirtyVariable("options_changed"); });
+        constructor.BindFunc("rt_spatial_bias",
+            [](Rml::Variant& out) { out = new_options.rt_spatial_bias; },
+            [](const Rml::Variant& in) { new_options.rt_spatial_bias = in.Get<float>(); graphics_model_handle.DirtyVariable("options_changed"); });
+        constructor.BindFunc("rt_authored_fill_budget",
+            [](Rml::Variant& out) { out = new_options.rt_authored_fill_budget; },
+            [](const Rml::Variant& in) { new_options.rt_authored_fill_budget = in.Get<float>(); graphics_model_handle.DirtyVariable("options_changed"); });
+        constructor.BindFunc("rt_ambient_floor",
+            [](Rml::Variant& out) { out = new_options.rt_ambient_floor; },
+            [](const Rml::Variant& in) { new_options.rt_ambient_floor = in.Get<float>(); graphics_model_handle.DirtyVariable("options_changed"); });
+        constructor.BindFunc("rt_environment_fill",
+            [](Rml::Variant& out) { out = new_options.rt_environment_fill ? "On" : "Off"; },
+            [](const Rml::Variant& in) {
+                new_options.rt_environment_fill = in.Get<std::string>() == "On";
+                graphics_model_handle.DirtyVariable("options_changed");
+            });
+        constructor.BindFunc("rt_ao",
+            [](Rml::Variant& out) { out = new_options.rt_ao ? "On" : "Off"; },
+            [](const Rml::Variant& in) {
+                new_options.rt_ao = in.Get<std::string>() == "On";
+                graphics_model_handle.DirtyVariable("options_changed");
+            });
         constructor.BindFunc("rt_shadows",
             [](Rml::Variant& out) { out = new_options.rt_shadows ? "On" : "Off"; },
             [](const Rml::Variant& in) {

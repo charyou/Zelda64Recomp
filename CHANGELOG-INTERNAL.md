@@ -4,6 +4,26 @@
 > Einträge, die älter als 3–4 Sessions sind, werden zu Kurzfassungen kompaktiert.
 > Details stehen dann nur noch in der Git-History beziehungsweise den verlinkten Projektdokumenten.
 
+## 2026-09-11 — Run 3 completed spatial AO and Environment Fill
+
+- User F1 evidence found the first AO barely visible. Expanded to configurable stronger finite contact plus environment enclosure, sharing nearest-hit samples/AS. Added bounded authored-fill response for conventional opaque texture-times-SHADE geometry and ambient-only RSP-light support.
+- Added resolved MM ambient RGB and generic hemisphere-lobe bridge, default-off independent Environment Fill, shared persistent/F1 tuning, separate RGBA16F contact/environment/normal signal with restored primitive export. No sky inference from a miss, vendor coupling or denoising subsystem. Final build passed with regenerated shader objects/wrappers and synchronized UI assets. Root paused-Town F1 off/AO/fill/both checks established localized contact and independent fill; final reduced fill default0.4 passed Town/night attract smoke with sun shadows off. No severe corruption/device loss observed; D3D12 runtime/performance and broad skyless-interior qualification remain open. Original narrow checkpoint remains preserved below.
+
+- Final candidate SHA256 963ACDEF7EF018A1C429B2FC1461DA4F0AAEBC9AE978AB42B08E6013DF7A0E45; evidence, logs and binary preserved in the Run3 diagnostics directory. Numeric config and final RML integration complete; user owns visual Graphics QA. ADR-009 documents bounded authored-fill ownership; foundation/handoff now describe the final source. Test processes stopped and disposable save backup restored. Parent/RT64/N64ModernRuntime changes uncommitted; Plume and all prior work preserved. Generated CHANGELOG.md remains untouched per its release workflow.
+
+## 2026-09-10 — Run 3 ambient/contact production checkpoint
+
+- Implemented independent default-off RT AO/contact using the existing opaque AS and SurfaceHit. Added reusable nearest finite-hit query, deterministic eight-ray radius-18 contact response, and ambient-only attenuation capped at 25%. Native/unsupported content, direct light, fog and legacy shadows retain their original responsibilities.
+- Added rt_ao persistence, F1 production toggle, launch override and Graphics row via a narrowly scoped Luna edit. Added F1-equivalent inspector launch hook for unreliable key injection. Actual checkbox AO on/off tested by root in late-night Town; indoor AO-on smoke passed with sun shadows off.
+- Project-local build regenerated real RT DXIL/SPIR-V objects/wrappers and raster consumers. Final small diagnostic-camera gate/help-format corrections await rebuild; sun coexistence remains to check. No broad platform/performance qualification. Environment Fill not implemented at checkpoint.
+- Preserved parent/submodule work; Run-2 renderer was already committed at run start. No Plume changes. Separate sunrise/camera shadow issues remain undiagnosed. Technical delta and current continuation are in RAYTRACING_FOUNDATION.md and HANDOFF.md. Generated CHANGELOG.md left untouched per its release workflow.
+
+## 2026-09-10 — Post-research lighting design qualifications
+
+- Linked the existing user-supplied lighting addendum into the Vision and clarified authority: MM research defines original semantics; the Vision remains the artistic/design baseline. Accepted supplied findings without repeating MM research; the named full MM semantics report is absent from the inspected checkout.
+- Qualified the original fixed run sequence and mandatory stability pass. Reassess local-source ownership, environment classification, energy interpretation and distinct actor-shadow responsibilities; retain separate undiagnosed runtime transients without forcing standalone investigations.
+- Updated handoff navigation and next-work guidance. Documentation only; no renderer changes, new ADR, build or runtime test. Checked document diffs and local links; generated release notes unchanged.
+
 ## 2026-09-10 — Directional RT visibility and real hard shadows (finished Run 2)
 
 - Extended the existing RT owner with sequential secondary visibility toward Workload's resolved environment sun, replay-local geometry/call/primitive/barycentric identity, and a full-resolution raw visibility/receiver texture. Explicit double-sided opaque thin-shell caster policy; existing alpha/blend exclusions and raster fallback retained.

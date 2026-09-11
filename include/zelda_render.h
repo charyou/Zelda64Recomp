@@ -49,6 +49,8 @@ namespace zelda64 {
             float clear_air_far_transmittance = 0.90f;
             float wet_air_far_transmittance = 0.65f;
             float water_influence = 0.0f;
+            uint32_t ambient_rgb = 0;
+            float sky_fill_weight = 0.0f;
         };
 
         void set_environment_fog(const EnvironmentFog& fog);

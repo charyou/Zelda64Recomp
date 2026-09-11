@@ -107,3 +107,16 @@
 **Why:** This delivered observable hardware intersections on real Town/Link geometry without restoring historical DI/GI/denoiser classes or touching the fragile lighting/fog ABI. Backend AS correctness repairs belong in the nested Plume source. The initial Vulkan multi-geometry range bug demonstrates that surviving API declarations alone are not runtime proof.
 
 **Consequences:** This diagnostic's double-sided, single-projection, opaque subset is not a production shadow contract. Alpha, clipping, culling, receiver semantics and caching remain separate work. Keep the primary-hit view as a regression reference for the next visibility consumer. Vulkan runtime is confirmed; D3D12, MSAA and broad HFR/scene-transition behavior remain unqualified. See `docs/RAYTRACING_FOUNDATION.md` for the exact implementation and evidence.
+
+
+## ADR-009 — Spatial RT refines bounded authored fill through shared signals
+
+Status: accepted, 2026-09-11.
+
+Run 3 uses the same submitted opaque scene, SurfaceHit and finite nearest-hit queries for contact and environment enclosure. Raw contact/environment visibility and geometric normals remain separate from hit identity/depth and from the ambient response. The resource contract is generic and backend-neutral; future reconstruction may consume it without owning MM semantics. No temporal identity or complete sky coverage is implied.
+
+On compatible RSP-lit geometry, only the explicit authored ambient term changes; direct lighting keeps its existing ownership. On conventional opaque texture-times-SHADE content without a recoverable ambient term, Enhanced may instead reserve a configurable authored-fill budget, bounded by both SHADE RGB and resolved environment ambient. This is an artistic partition of existing appearance, not a physical decomposition or proof of non-emission. Unsupported/special combiners and Native retain their original paths. Combined contact/enclosure retains one protected floor to avoid compounded blackening; legacy actor shadows remain.
+
+Zelda64Recomp publishes post-adjustment ambient RGB and a broad hemisphere-lobe hint through the existing per-frame environment bridge. RT64 receives resolved generic values, not MM IDs or lighting-mode policy. Natural-sky presentation metadata shapes the lobe; finite TLAS queries describe nearby obstruction only. A miss never establishes open sky. Skyless rooms use isotropic authored fill, and absent geometry may under-occlude it. This bounded approximation is intentionally not GI or physical skylight transport.
+
+Controls and tuning use the existing runtime/configuration path. AO, Environment Fill and Sun Shadows are independent; numerical budgets/ranges/sample count/bias are shared settings available to F1 and Graphics. Future quality presets should reuse those settings, not introduce another owner.

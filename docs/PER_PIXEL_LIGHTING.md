@@ -37,3 +37,7 @@ Runtime evidence and current limitations are recorded in `HANDOFF.md`; disposabl
 `RT64_LIGHTING_DIAGNOSTICS=1` logs set/mixed/transform/positional rejection counts. `RT64_LIGHTING_COVERAGE=1` shows actual visible surfaces: green enhanced, blue absent/unsupported light set, magenta mixed vertex state, red incompatible transforms, cyan positional lights, gray outside the classifier. Both are developer-only launch diagnostics. Temporary aggressive/conservative modes were removed after the normal-strength experiment.
 
 The 2026-09-09 continuation evidence is under `_working-directory/diagnostics/2026-09-07-coverage/` (the directory predates the restart). Earlier yellow captures identify the removed normal-length gate. The Clock Tower interior remained blue while characters were green; Town wall/ground sections changed from yellow to green. This is a focused real-mod-stack check, not a claim about every scene or mod.
+
+## Run 3 spatial-lighting extension
+
+Ambient-only RSP sets (one ambient, zero directionals) are now eligible as well. The existing transform/normal/light-equivalence rules remain. On exact per-pixel lighting the new spatial response changes ambient only; matching direct sun visibility remains separate. Other opaque texture-times-SHADE draws can receive an explicitly budgeted authored-fill refinement without converting them to per-pixel lighting. See ADR-009 and the Run-3 delta in RAYTRACING_FOUNDATION.md; this fallback is an artistic partition, not an assertion that baked vertex RGB contains clean ambient/direct components.
