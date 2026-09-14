@@ -54,7 +54,7 @@ void debug_play_update(PlayState* play) {
         do_warp(play, pending_warp);
     }
 
-    u32 pending_set_time = recomp_get_pending_set_time();
+    u32 pending_set_time = recomp_get_pending_set_time(gSaveContext.gameMode == GAMEMODE_NORMAL);
     if (pending_set_time != 0xFFFF) {
         u8 day    = (pending_set_time >> 16) & 0xFF;
         u8 hour   = (pending_set_time >>  8) & 0xFF;

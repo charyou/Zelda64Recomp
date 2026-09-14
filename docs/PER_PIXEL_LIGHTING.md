@@ -41,3 +41,9 @@ The 2026-09-09 continuation evidence is under `_working-directory/diagnostics/20
 ## Run 3 spatial-lighting extension
 
 Ambient-only RSP sets (one ambient, zero directionals) are now eligible as well. The existing transform/normal/light-equivalence rules remain. On exact per-pixel lighting the new spatial response changes ambient only; matching direct sun visibility remains separate. Other opaque texture-times-SHADE draws can receive an explicitly budgeted authored-fill refinement without converting them to per-pixel lighting. See ADR-009 and the Run-3 delta in RAYTRACING_FOUNDATION.md; this fallback is an artistic partition, not an assertion that baked vertex RGB contains clean ambient/direct components.
+
+## Semantic local-light extension — 2026-09-13
+
+Verified semantic annotations now participate in light-set equivalence. `pixelLighting.y` stores count in bits0–7 and tagged-positional presence in bit8. Positional sets become candidates only when every positional term has source ownership; untagged positional sets stay original. New TEXCOORD2 float3 retains original interpolated SHADE for exact fallback on rejected/missing RT receivers. All dynamic/specialized/library shader signatures were updated together. Accepted local terms receive modern per-pixel response and finite RT visibility; ambient, other directionals, authored normal magnitude, combiner, alpha and fog retain their roles.
+
+Default-off `rt_local_lights`, F1 controls, F6 diagnostics and the complete replacement contract are documented in [SEMANTIC_LOCAL_LIGHTS.md](SEMANTIC_LOCAL_LIGHTS.md). This extension supersedes the earlier blanket exclusion of true positional lights only for annotated supported sets.

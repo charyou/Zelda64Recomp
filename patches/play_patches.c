@@ -95,6 +95,8 @@ void controls_play_update(PlayState* play) {
 
 // @recomp Patched to add hooks for various added functionality.
 RECOMP_PATCH void Play_Main(GameState* thisx) {
+    extern void recomp_reset_light_receipts(void);
+    recomp_reset_light_receipts();
     static Input* prevInput = NULL;
     PlayState* this = (PlayState*)thisx;
 

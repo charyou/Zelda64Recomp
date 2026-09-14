@@ -4,6 +4,12 @@
 > Einträge, die älter als 3–4 Sessions sind, werden zu Kurzfassungen kompaktiert.
 > Details stehen dann nur noch in der Git-History beziehungsweise den verlinkten Projektdokumenten.
 
+## 2026-09-13 — Run 4 semantic local lights and deterministic active-source validation
+
+- Added generic source annotations, verified MM binding receipts, original-term replacement, smooth finite per-pixel local direct light and source-weighted finite RT visibility on the existing scene. Positional receiver fallback preserves original SHADE; other safe lighting responsibilities remain independent. ADR-010 and SEMANTIC_LOCAL_LIGHTS.md document the bound-source contract and future profile boundary. No game-specific renderer branches, emitter inference, synthetic system or GI.
+- Added default-off config/F1 controls and six lighting views (F6 cycle). Real Vulkan active-torch tests establish Link/NPC/static-prop ownership, direct contribution, exposed/occluded response, feature-off comparison and no-owned-source fallback. Paused A/B leaves a 55,000-pixel unbound floor region identical; accepted receivers change. This does not claim all world floors receive locals. User captures supplement root evidence.
+- Fixed finite developer playback retaining controller input forever: normal input resumes after completion, with focused boundary/rejection checks and explicit user controller confirmation. Added bounded normal-gameplay time and inspector-layout hooks for repeatable nighttime tests.
+- Final local toolchain build passed, including actual SPIR-V/DXIL regeneration; Vulkan RX9070XT passed targeted smoke. Candidate E094DF88F91D5D79C9CCAE977852C70E133FACA9ACA5173158E40A54C8AE5CFD and evidence preserved in 2026-09-13-local-lights/finished-run4. D3D12 runtime, broad qualification and Run-3 motion/energy issues remain open. Changes uncommitted; supplied documents and unrelated work preserved. Generated CHANGELOG.md unchanged per release workflow.
 ## 2026-09-11 — Run 3 completed spatial AO and Environment Fill
 
 - User F1 evidence found the first AO barely visible. Expanded to configurable stronger finite contact plus environment enclosure, sharing nearest-hit samples/AS. Added bounded authored-fill response for conventional opaque texture-times-SHADE geometry and ambient-only RSP-light support.

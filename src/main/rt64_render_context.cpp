@@ -234,6 +234,7 @@ void set_application_user_config(RT64::Application* application, const ultramode
     if (application->workloadQueue) {
         application->workloadQueue->rtShadows = config.rt_shadows;
         application->workloadQueue->rtAO = config.rt_ao;
+        application->workloadQueue->rtLocalLights = config.rt_local_lights;
         application->workloadQueue->rtEnvironmentFill = config.rt_environment_fill;
         application->workloadQueue->aoRadius = config.rt_ao_radius;
         application->workloadQueue->aoStrength = config.rt_ao_strength;
@@ -395,6 +396,9 @@ zelda64::renderer::RT64Context::RT64Context(uint8_t* rdram, ultramodern::rendere
     app->workloadQueue->spatialBias = cur_config.rt_spatial_bias;
     app->workloadQueue->authoredFillBudget = cur_config.rt_authored_fill_budget;
     app->workloadQueue->ambientFloor = cur_config.rt_ambient_floor;
+    const char* localOverride = std::getenv("RT64_RT_LOCAL_LIGHTS");
+    app->workloadQueue->rtLocalLights = localOverride ? std::strcmp(localOverride, "1") == 0 : cur_config.rt_local_lights;
+    if (const char* view = std::getenv("RT64_LIGHTING_DEBUG")) app->workloadQueue->lightingDebug = std::clamp(std::atoi(view), 0, 5);
     const char* aoOverride = std::getenv("RT64_RT_AO");
     app->workloadQueue->rtAO = aoOverride ? std::strcmp(aoOverride, "1") == 0 : cur_config.rt_ao;
     const char* shadowOverride = std::getenv("RT64_RT_SHADOWS");

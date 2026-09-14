@@ -104,6 +104,7 @@ namespace ultramodern {
             {"fog_option",      config.fog_option},
             {"rt_shadows",      config.rt_shadows},
             {"rt_ao",           config.rt_ao},
+            {"rt_local_lights", config.rt_local_lights},
             {"rt_environment_fill", config.rt_environment_fill},
             {"rt_ao_radius", config.rt_ao_radius},
             {"rt_ao_strength", config.rt_ao_strength},
@@ -131,6 +132,7 @@ namespace ultramodern {
         config.fog_option       = from_or_default(j, "fog_option",      fog_default);
         config.rt_shadows       = from_or_default(j, "rt_shadows",      false);
         config.rt_ao            = from_or_default(j, "rt_ao",           false);
+        config.rt_local_lights = from_or_default(j, "rt_local_lights", false);
         config.rt_environment_fill = from_or_default(j, "rt_environment_fill", false);
         config.rt_ao_radius = from_or_default(j, "rt_ao_radius", 45.00f);
         config.rt_ao_strength = from_or_default(j, "rt_ao_strength", 0.80f);
@@ -377,6 +379,7 @@ void reset_graphics_options() {
     new_config.fog_option = fog_default;
     new_config.rt_shadows = false;
     new_config.rt_ao = false;
+    new_config.rt_local_lights = false;
     new_config.rt_environment_fill = false;
     new_config.rt_ao_radius = 45.00f;
     new_config.rt_ao_strength = 0.80f;

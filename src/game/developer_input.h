@@ -14,7 +14,8 @@
 namespace zelda64 {
 
 // Opt-in controller-read playback for visual validation, not a save-state or
-// deterministic simulation system. Once opted in, physical input stays ignored.
+// deterministic simulation system. Successful finite playback returns control to
+// the normal input path; malformed sequences remain neutral to expose test errors.
 class DeveloperInputPlayback {
     struct Step {
         uint32_t reads;
@@ -110,7 +111,8 @@ public:
                     remaining = steps[index].reads;
                 }
                 else {
-                    fprintf(stderr, "[Dev input] Finished after %llu controller-0 reads; subsequent input is neutral.\n",
+                    enabled = false;
+                    fprintf(stderr, "[Dev input] Finished after %llu controller-0 reads; normal input restored.\n",
                         static_cast<unsigned long long>(total_reads));
                     fflush(stderr);
                 }

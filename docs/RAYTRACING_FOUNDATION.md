@@ -1,5 +1,7 @@
 # Hardware RT foundation and directional hard shadows
 
+**2026-09-13 local-light delta:** [SEMANTIC_LOCAL_LIGHTS.md](SEMANTIC_LOCAL_LIGHTS.md) documents the generic semantic source/ownership path, finite local visibility, raster response, diagnostics, updated resource ABI and test hooks. It extends the same Run-3 scene and signals. See HANDOFF.md for final validation state; historical run descriptions below retain their original scope.
+
 Current: 2026-09-10 Run 2 finished; mandatory result checkpointed before UI. Vulkan hardware visibility and real Enhanced shadows visibly validated. Run 1 is preserved in git history; its primary-hit diagnostic remains independent. The incomplete historical `RT_ENABLED` renderer remains disabled.
 
 ## Direction and lighting ownership

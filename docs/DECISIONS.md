@@ -120,3 +120,11 @@ On compatible RSP-lit geometry, only the explicit authored ambient term changes;
 Zelda64Recomp publishes post-adjustment ambient RGB and a broad hemisphere-lobe hint through the existing per-frame environment bridge. RT64 receives resolved generic values, not MM IDs or lighting-mode policy. Natural-sky presentation metadata shapes the lobe; finite TLAS queries describe nearby obstruction only. A miss never establishes open sky. Skyless rooms use isotropic authored fill, and absent geometry may under-occlude it. This bounded approximation is intentionally not GI or physical skylight transport.
 
 Controls and tuning use the existing runtime/configuration path. AO, Environment Fill and Sun Shadows are independent; numerical budgets/ranges/sample count/bias are shared settings available to F1 and Graphics. Future quality presets should reuse those settings, not introduce another owner.
+
+## ADR-010 — Semantic local sources replace verified RSP contributions
+
+Status: accepted, 2026-09-13.
+
+Generic source response is independent of game identity and visible-emitter appearance. The first production consumer attaches a source record to a verified original RSP slot, invalidates it on ordinary light reload/color edits, and snapshots it at vertex load. MM owns verification of its positional/reference-directional binding realizations; RT64 owns per-pixel response and finite source visibility. Only accepted owned terms are replaced. Tagged positional draws retain original interpolated SHADE when RT receiver validation fails. Other directional and ambient responsibilities remain separate.
+
+The initial path enhances bound sources on supported characters, static props and positional-lit world geometry. Unbound source application is not inferred from proximity or bright textures. Future game profiles may explicitly permit spatial or synthetic treatment using the same generic source/visibility functions, with independent receiver permission and source collection. No second renderer is required, and no missing-semantic case implicitly authorizes synthetic lighting. See [SEMANTIC_LOCAL_LIGHTS.md](SEMANTIC_LOCAL_LIGHTS.md) for ABI, response, adapter lifetime and limitations.

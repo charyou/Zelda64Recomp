@@ -1,4 +1,7 @@
 #include <atomic>
+#include <cstdlib>
+#include <cstdio>
+#include "ultramodern/config.hpp"
 #include "zelda_debug.h"
 #include "librecomp/helpers.hpp"
 #include "../patches/input.h"
@@ -22,6 +25,20 @@ void zelda64::set_time(uint8_t day, uint8_t hour, uint8_t minute) {
 }
 
 extern "C" void recomp_get_pending_set_time(uint8_t* rdram, recomp_context* ctx) {
+    // One-shot reproducible lighting setup through the existing developer action.
+    static bool launchTimeChecked = false;
+    if (!launchTimeChecked && _arg<0, int32_t>(rdram, ctx) != 0) {
+        launchTimeChecked = true;
+        if (ultramodern::renderer::get_graphics_config().developer_mode) {
+            if (const char* value = std::getenv("ZELDA64RECOMP_DEV_TIME")) {
+                unsigned day, hour, minute;
+                if (std::sscanf(value, "%u,%u,%u", &day, &hour, &minute) == 3 && day >= 1 && day <= 3 && hour < 24 && minute < 60) {
+                    zelda64::set_time(day, hour, minute);
+                    fprintf(stderr, "[Dev time] Day %u, %02u:%02u\n", day, hour, minute);
+                }
+            }
+        }
+    }
     // Return the current set time value and reset it.
     _return(ctx, pending_set_time.exchange(0xFFFF));
 }

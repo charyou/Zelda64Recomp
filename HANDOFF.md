@@ -1,54 +1,53 @@
 # Handoff
 
-> 2026-09-11 — Run 3 complete: production scene-wide eligible AO/contact plus first Environment/Skylight Fill, independently default-off. Final build and focused Vulkan tests passed. User owns broader visual tuning and final Graphics-menu visual QA.
+> 2026-09-13 — Run 4 semantic local-light pipeline implemented and targeted active-source validation completed. Final build/Vulkan smoke passed; checkpoint binary and paused A/B evidence preserved. Normal controller input after deterministic playback is fixed and confirmed by the user. Changes remain uncommitted.
 
-## Current result
+## Current implementation
 
-The first narrow radius18 / 25%-ambient AO was checkpointed, then the user reported that F1 A/B was barely visible. The expanded implementation supersedes it:12 shared finite nearest-hit rays, radius45 contact, stronger configurable response, radius300 environment enclosure, and a bounded authored-fill response extending beyond per-pixel-lit characters to eligible opaque scene geometry. Environment Fill defaults to strength0.4 after the0.65 trial was too strong on the shield.
+Run 3 sun/contact/environment remains. Run 4 adds a default-off generic semantic local-source path: MM binding receipts -> generic RSP-slot source annotation -> verified replacement of original terms -> per-pixel finite local response -> finite RT visibility. RT64 contains no MM actor/scene branches. Visible emitters remain separate; no bloom, synthetic sources or GI was added.
 
-Read docs/RT_LIGHTING_VISION.md with docs/Addendum to RT_LIGHTING_VISION.md for accepted artistic/MM context; no repeated broad MM research was performed. **docs/RAYTRACING_FOUNDATION.md -> Run 3 — Ambient / Spatial Lighting** is the complete current technical delta. ADR-009 in docs/DECISIONS.md records the durable response/ownership choice; PER_PIXEL_LIGHTING.md records ambient-only RSP eligibility.
+Read `docs/SEMANTIC_LOCAL_LIGHTS.md` for the implemented contract, ABI, response, controls and limits; ADR-010 in `docs/DECISIONS.md` records the ownership boundary. `docs/MM_LIGHTING_SEMANTICS_RESEARCH.md` is supplied authoritative research, already used; do not repeat it. `docs/RT_LIGHTING_VISION.md` retains the artistic baseline. Run-3 details remain in `docs/RAYTRACING_FOUNDATION.md` and ADR-009.
 
-## Files, ownership and flow
+The adapter verifies both positional and reference-directional realizations using original MM bind functions, unchanged light-group snapshots and consumed frame-local receipts. Ordinary RSP loads/color edits invalidate annotations. Unsupported/modified/reused bindings retain original lighting. Raster removes only RT-accepted owned terms. Tagged positional sets preserve original interpolated SHADE for failed receiver validation. Other lighting responsibilities remain independent.
 
-- RT64 PrimaryHitRT.hlsl: same submitted opaque BLAS/TLAS and SurfaceHit; traceSurface returns nearest finite geometry/primitive/barycentric/distance data. One deterministic cosine sample set returns independent contact and longer-range enclosure visibility. Existing binary sun visibility stays separate.
-- RaytracingDebug owns new RGBA16F spatial output (contact, environment visibility, oct-normalXY) beside the existing RGBA32F sun/call/clipW/primitive result. No duplicate AS, history/denoising or vendor-specific interfaces. TraceParams128 bytes, FramebufferParams80 bytes, both statically checked; RDPParams336 and raster varyings unchanged.
-- SpatialLighting.hlsli / RasterPS / PerPixelLighting: exact RSP ambient is refined before unchanged direct-light addition. Conventional opaque texture-times-SHADE fallback instead reserves min(SHADE*budget, resolvedEnvironmentAmbient). This is an explicitly budgeted artistic approximation, not recovered original ambient or PBR. Unsupported/special/alpha content and Native retain original rendering. Original blobs remain. One shared floor bounds combined ambient darkening.
-- Small MM bridge: patches/play_patches.c -> internal RecompEnvironmentFog31-word packet -> recomp_api.cpp / EnvironmentFog -> AtmosphereParameters::environmentFill / existing Workload snapshot. Publishes post-adjustment LightContext ambient RGB and a natural-sky/ordinary-room hemisphere-lobe hint. RT64 sees generic RGB/weight, no MM IDs. A finite TLAS miss is never interpreted as open sky. Skyless rooms use isotropic authored fill; missing culled geometry can still under-occlude it.
-- WorkloadQueue atomics and DrawParams carry the controls/tuning on the existing config path. Parent config.hpp addition is in lib/N64ModernRuntime; JSON/reset/apply/bindings are in src/game/config.cpp, src/main/rt64_render_context.cpp, src/ui/ui_config.cpp. graphics.rml has Luna's narrowly scoped toggle/range/help/navigation integration; source/build/isolated-runtime copies match (final manual RML sync; see final-assets-synchronized.txt).
+**Coverage is bound-source enhancement:** Link/NPCs, static props and supported positional-lit world draws can receive locals. World surfaces with no original local binding retain current direct lighting and any independently enabled Run-3 spatial treatment. This is not scene-wide injection of every LightContext source. Extending to unbound receivers requires an explicit contribution/absence contract or profile permission, not proximity guessing.
 
-## Controls
+## Controls and reproduction
 
-F1 -> Game editor -> Lighting:
-- RT AO / Contact Grounding — rt_ao, default false/Off.
-- RT Environment / Skylight Fill — rt_environment_fill, default false/Off.
-- Existing Experimental RT sun shadows remains independent.
+- F1 -> Lighting: RT semantic local lights; default-off persistent JSON `rt_local_lights`. F1 edits are session-local. No new preset/Graphics-menu UI.
+- F1 lighting-view combo: shaded, ownership, influence, direct, shadows, fallback reasons. F6 cycles in developer mode; F1 controls were directly validated, injected F6 was unreliable.
+- Launch: `RT64_RT_LOCAL_LIGHTS=0|1`, `RT64_LIGHTING_DEBUG=0..5`. Existing AO/fill/sun controls remain independent.
+- Isolated launcher: `pwsh -NoProfile -ExecutionPolicy Bypass -File _working-directory/diagnostics/2026-09-13-local-lights/run.ps1 -Local -Town -NearTorches -Inspector`.
+- Launcher uses the existing copied mod/profile runtime under `2026-09-07-coverage/runtime`, final executable `rt-local.exe`. Close a previous isolated test first. Launch/stop uses the established interactive execution boundary.
+- `near-torches.json` loads the current copied Town save and walks toward the stall/torch, then releases normal input after 1112 controller reads. Successful playback no longer holds controller 0 neutral forever. Malformed playback still rejects with neutral input. Unit checks passed; user explicitly confirmed the controller works.
+- Developer-only `ZELDA64RECOMP_DEV_TIME=day,hour,minute` sets time once in normal gameplay, skipping title attract. Launcher defaults to day1,23:00. `RT64_DEV_INSPECTOR_LAYOUT=1` keeps the actual inspector inside the test window.
+- Existing Debugger Pause/Resume holds renderer workload for local-toggle A/B. Per-pixel classification changes require a new workload; do not interpret their paused checkbox alone as an original-path test.
 
-Shared numeric JSON/Rml fields (also F1 sliders): rt_ao_radius45; rt_ao_strength0.8; rt_environment_radius300; rt_environment_strength0.4; rt_spatial_samples12; rt_spatial_bias0.1; rt_authored_fill_budget0.45; rt_ambient_floor0.35. See foundation table for bounds. F1 controls are session-local; Graphics Apply publishes persistent values. No quality-preset system was added.
+## Build and decisive evidence
 
-Launch overrides: RT64_RT_AO=0|1, RT64_RT_ENVIRONMENT_FILL=0|1, existing RT64_RT_SHADOWS. ZELDA64RECOMP_DEV_INSPECTOR=1 opens the actual F1 inspector at setup when injected function keys fail (developer_mode required). Root used real mouse checkboxes; do not confuse the launch hook with an alternate fake toggle.
+Build: `pwsh -NoProfile -ExecutionPolicy Bypass -File _working-directory/diagnostics/2026-09-06/build-control.ps1` using the documented project-local LLVM19/VS/Ninja toolchain.
 
-## Build and runtime evidence
+Final executable: `_working-directory/build-zelda-validation/Zelda64Recompiled.exe`.
+SHA256: **E094DF88F91D5D79C9CCAE977852C70E133FACA9ACA5173158E40A54C8AE5CFD**.
 
-Build command: pwsh -NoProfile -ExecutionPolicy Bypass -File _working-directory/diagnostics/2026-09-06/build-control.ps1.
+Checkpoint: `_working-directory/diagnostics/2026-09-13-local-lights/finished-run4/` contains executable, build logs, runtime log and paused captures. `local-build11.log` is the final successful build; preceding logs include regenerated real RT/raster SPIR-V and DXIL variants. Vulkan RX9070XT runtime validated; D3D12 only compiled.
 
-Final candidate: _working-directory/build-zelda-validation/Zelda64Recompiled.exe, SHA256 **963ACDEF7EF018A1C429B2FC1461DA4F0AAEBC9AE978AB42B08E6013DF7A0E45**. Same candidate at the isolated coverage/runtime/rt-ambient.exe and preserved in _working-directory/diagnostics/2026-09-10-rt-ambient/finished-run3/. The normal build assets and isolated runtime graphics.rml are synchronized. run3-cluster-build.log and run3-final-cluster-build.log record real shader objects/wrappers and successful Clang/LLD links, not dependency-only generation. DXIL compiled; D3D12 runtime was not tested.
+Targeted active-source results (AO/environment/sun off for isolation):
 
-Root directly tested Vulkan RX9070XT, copied mod stack, Enhanced per-pixel lighting, Atmospheric fog, original cutout-AA:
-- Initial checkpoint: indoor AO-on and nighttime Town F1 on/off, sun shadows off.
-- Expanded cluster: existing Debugger -> Pause (F4) held a Town workload for actual independent F1 off/AO/fill/both captures, with sun shadows enabled. cluster-paused-*.png and paused-pixel-check.txt are decisive evidence. AO post-contact mean RGB delta(-5.019,-3.109,-1.945); open floor(-0.538,-0.312,-0.274); sky unchanged. Localized AO is now measurable and visible without broad open-floor darkness.
-- Fill A/B changed exposed flooring and enclosed character surfaces independently. These captures use trial fill strength0.65; final default0.4 is deliberately milder. Final rebuilt candidate passed title/attract Town and nighttime moon/Skull Kid smoke with AO/fill enabled and sun shadows disabled; final-attract-town.png and final-attract-night.png. No severe corruption/device loss or obvious fog/UI regression observed. Expanded skyless-interior A/B remains unqualified; do not claim it from the initial narrow indoor smoke.
-- No broad MSAA/HFR/scene/mod matrix or performance benchmark. Paused workload removes scene/time motion but post-blend noise and UI animation can still differ.
+- Runtime confirms generic source ingestion (first logged source slot0, position -278/50/-801, range100, RGB1/1/1) and hardware RT pipeline startup. Actual torch receivers are separately visible in diagnostics; the first logged source is not asserted to be that torch.
+- Deterministic near-torch route reaches a useful normal-gameplay nighttime state. Camera/character motion and dynamic flame/source state remained sane during approach; no corruption/device loss observed. No dedicated moving-light actor or HFR qualification.
+- Paused ownership view shows Link, stall and pedestal amber. Direct view shows warm source contribution on Link/stall. Shadow response shows exposed yellow surfaces and blue/purple occluded pedestal, character and structure surfaces. This is source-weighted shadow authority, not raw binary visibility.
+- `paused-local-on.png` / `paused-local-off.png` are matched workload captures. Local-on minus off mean RGB: Link crop (-3.430,-2.557,+0.059), stall (-11.575,-5.839,-0.044), pedestal (-2.594,-1.582,+0.665). Replacement can reduce original vertex-light energy; this is not additive double lighting. The 55,000-pixel unbound-floor crop is exactly unchanged. Coordinates/results are in `paused-pixel-check.json`.
+- `paused-ownership/direct/shadows/fallback.png` explain accepted replacements, no-owned-source world draws and RT-ineligible cutout/awning portions retaining original rendering. Unsupported receipt/mod cases are conservative code paths, not an exhaustive runtime fault-injection matrix.
+- After resuming with per-pixel lighting disabled, a fresh workload rendered correctly through the original lighting path (original-live.png). Re-enabling per-pixel lighting after the daytime torches disappeared showed no stale amber source ownership. Renderer pause freezes the workload, not game simulation/time.
+- User's five supplied captures are preserved as `user-evidence-0..4.png`: an additional NPC/stall/pedestal active-source view and shaded scene with AO/fill/sun. They support coexistence but are not matched quantitative A/B evidence.
 
-Evidence/launcher: _working-directory/diagnostics/2026-09-10-rt-ambient/run.ps1 [-AO] [-Fill] [-Shadows] [-Town] [-Inspector]. Without -Town, never Start Game; attract scenes cycle automatically. With -Town, old finite input playback uses whichever copied save state is current. Do not assume old save a/bastian contents from stale docs. Launch/stop requires the documented interactive execution boundary.
+Original user profile was not used for game writes. Pre-run disposable save copies remain in `saves-before/`; do not restore them over subsequent user testing without reason. The isolated test process is stopped after validation; original user profile remains untouched.
 
-## Preserved state and limitations
+## Repository and remaining limits
 
-All test processes are stopped. The disposable saves from before the seed-based coexistence test were backed up under profile-backup/ and restored; save hashes are in final-restore-and-assets.txt; final RML synchronization hashes are in final-assets-synchronized.txt. Original user profile was not used for game writes. Existing rt-shadows.exe/finished-run2 evidence remains intact.
+Run 3 was already committed at run start: parent2342a42, RT642986426. Run-4 edits are in parent, RT64 and N64ModernRuntime. Preserve supplied research, existing Vision/addendum/input-research changes, `lib/rt64.7z`, mods and all unrelated work. No submodule reset/update/replacement. Plume unchanged. Generated CHANGELOG.md remains owned by its release-note workflow.
 
-At run start parent HEAD a39610f and RT64 HEAD2f73d68 already contained Run-2 code, contrary to stale handoff claims. Run3 changes remain uncommitted in parent, RT64 and N64ModernRuntime. Preserve existing modified lighting Vision, supplied untracked addendum, docs/input-research, lib/rt64.7z and all other user work. No submodule reset/clean/update/replacement; Plume unchanged this run. Preserve Native/RDRAM, ADR-006 withdrawn camera publication and shader compile/dependency fixes.
+Known Run-3 energy/readability and motion artifacts, sunrise transient and separate camera/geometry shadow-collapse are not claimed fixed. Current TLAS only sees submitted eligible opaque geometry; game-culled/cutout geometry can be missing. Sources update at simulation rate without temporal interpolation/denoising; original seven-slot selection limits availability. Nonzero source-radius sampling is implemented generically but MM defaults to point sources and soft-source runtime qualification remains open.
 
-Known sunrise shadow transient and separate camera/geometry shadow-collapse remain undiagnosed and were not investigated or masked. RT only sees submitted eligible geometry and one validated world projection. Unsupported cutouts/blends remain excluded. Sparse fixed samples can show directional bands/creases or motion-dependent changes. Authored-fill partition can redistribute baked lighting on conventional opaque textured surfaces; it is deliberately bounded but not a proof of physical material semantics. Existing blobs may overlap AO. No temporal IDs/motion vectors/history validation are supplied yet.
-
-## Strongest continuation
-
-Start with this final binary and the shared F1 radius/strength/budget controls; compare grounded posts/feet, skyless room palettes and camera motion against feature-off on the user's mod stack. Use the existing renderer pause for stable A/B. If a concrete artifact appears, improve the current shared signal/Surface Response path; preserve contact/environment separation and the backend-neutral raw hit/normal interface. Do not begin new MM research, vendor-specific denoising, local-light replacement, GI or a new RT scene merely to continue. The complete production cluster is present; next work should address evidenced coverage/quality limitations rather than reimplement its plumbing.
+No indirect prototype: a trustworthy bounded bounce/color budget needs additional surface-response work, beyond this completed direct-light checkpoint. Future work should address demonstrated ownership/coverage or signal quality using the same source and RT scene, not repeat the supplied semantic research or build a second lighting renderer.
