@@ -1,8 +1,21 @@
 # Internal Changelog
 
+## 2026-09-14 — Spatial GI and RT+ authority
+
+- Added independent spatial receiver/provenance traits and source-authorized unowned direct while preserving Run-4 owned replacement. Monotonic textured and untextured SHADE share the boundary; sky/special/cutout/modified content remains excluded.
+- Added bounded four-sample one-bounce diffuse transport from explicit authored primary/secondary environment sources and two relevant verified local sources selected per receiver. Separate raw radiance/hit-distance and depth/normal guides feed a replaceable spatial reconstruction backend; no temporal/vendor integration.
+- RT+ transfers supported ambient/fill responsibility using reconstruction confidence, finite enclosure/contact and bounded transport. Primary direct direction+RGB visibility and secondary direct remain distinct; invalid responsibilities retain their authored fallback.
+- Build2/3 Vulkan Inn/Town checks: authored-color room participation, raw/reconstructed noise reduction, matched authority0/1 visible difference, and separate unowned floor / owned Link+stall local-direct signals. Coarse world-cell checkerboard removed. Final build4 passes and runs in daylight; exact artifacts, loaded-scene caveat and limits in HANDOFF.md. Evidence in _working-directory/diagnostics/2026-09-14-spatial-gi.
+- F1/JSON/launch controls, one-shot developer entrance and ADR-011 documented. Limits: opaque subset, draw-level tint proxy, capped verified bound snapshots rather than full scene source publication, spatial-only denoising and incomplete motion qualification. Generated CHANGELOG.md retained per release workflow.
+
 > Konvention: Neueste Session oben, detailliert (Änderungen + Erkenntnisse).
 > Einträge, die älter als 3–4 Sessions sind, werden zu Kurzfassungen kompaktiert.
 > Details stehen dann nur noch in der Git-History beziehungsweise den verlinkten Projektdokumenten.
+
+## 2026-09-14 — Enhanced per-pixel coverage audit
+
+- Diagnosis-only Run-4 audit captured fresh South Clock Town, Stock Pot Inn and Termina Field normal/coverage evidence on the isolated copied profile. Representative candidate/Legacy counts were 514/119, 197/242 and 300/128; all counted fallback was `set`, with zero mixed/transform/positional rejects in the sampled workloads.
+- Outdoor floors, buildings, trees, props and characters were Enhanced; visible blue was sky/background. The coherent blue Inn environment is the high-value gap and needs targeted authored-SHADE/light-set provenance plus an architectural decision, not an unproven local gate relaxation. `docs/PER_PIXEL_COVERAGE_AUDIT.md` and the machine-readable diagnostics summary preserve the baseline. No renderer behavior changed; copied save/config were restored and test processes stopped.
 
 ## 2026-09-13 — Run 4 semantic local lights and deterministic active-source validation
 

@@ -1,5 +1,8 @@
 # Hardware RT foundation and directional hard shadows
 
+**2026-09-14 current extension:** [SPATIAL_LIGHTING.md](SPATIAL_LIGHTING.md) documents the same scene's receiver boundary, one-bounce global/local GI, separate raw/guides/reconstruction and RT+ composition. Lighting now uses explicitly published resolved primary direction AND RGB; secondary directional is separate. Visual sunPos remains atmosphere presentation metadata. The Run-2 direction description below is historical and superseded for lighting by this contract. FramebufferParams112, TraceParams128, RSPLight96, RDPParams336.
+
+
 **2026-09-13 local-light delta:** [SEMANTIC_LOCAL_LIGHTS.md](SEMANTIC_LOCAL_LIGHTS.md) documents the generic semantic source/ownership path, finite local visibility, raster response, diagnostics, updated resource ABI and test hooks. It extends the same Run-3 scene and signals. See HANDOFF.md for final validation state; historical run descriptions below retain their original scope.
 
 Current: 2026-09-10 Run 2 finished; mandatory result checkpointed before UI. Vulkan hardware visibility and real Enhanced shadows visibly validated. Run 1 is preserved in git history; its primary-hit diagnostic remains independent. The incomplete historical `RT_ENABLED` renderer remains disabled.

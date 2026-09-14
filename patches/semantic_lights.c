@@ -88,7 +88,7 @@ RECOMP_PATCH void Lights_BindAll(Lights* lights, LightNode* node, Vec3f* refPos,
                     { p->x, p->y, p->z, p->radius },
                     { p->color[0] / 255.0f, p->color[1] / 255.0f, p->color[2] / 255.0f, 1.0f },
                     // Small authored sources have continuously weaker, shorter shadows.
-                    { CLAMP(p->radius / 160.0f, 0.0f, 1.0f), p->radius, 0.0f, 0.0f }
+                    { CLAMP(p->radius / 160.0f, 0.0f, 1.0f), p->radius, 0.0f, 0.35f }
                 };
             }
         }

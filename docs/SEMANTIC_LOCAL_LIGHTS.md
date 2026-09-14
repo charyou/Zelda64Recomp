@@ -1,10 +1,13 @@
 # Semantic local lights
 
+**2026-09-14 extension:** [SPATIAL_LIGHTING.md](SPATIAL_LIGHTING.md) adds independently authorized unowned direct and selected local-source illumination at GI bounce hits. MM grants source.response.w=.35 for spatial direct and generic environment-profile localBounceStrength=.75 for indirect. Run-4 ownership below is preserved; its original bound-only coverage is no longer the entire Enhanced local-light scope.
+
+
 Implementation: 2026-09-13. See HANDOFF.md for current validation/build state.
 
 ## Generic source and ownership
 
-`SemanticLight` is a 48-byte record: world position/range, authored RGB/direct strength, and shadow authority/range/source radius/reserved-zero. It describes a stylized source, not physical radiance, a material or a visible emitter. `RSPLight` grows from 48 to 96 bytes. RT64 contains no MM source/actor/scene/texture branches.
+`SemanticLight` is a 48-byte record: world position/range, authored RGB/direct strength, and shadow authority/range/source radius/unowned spatial strength. It describes a stylized source, not physical radiance, a material or a visible emitter. `RSPLight` grows from 48 to 96 bytes. RT64 contains no MM source/actor/scene/texture branches.
 
 `gEXSetLightSource` (extended opcode 0x34; two commands; zero-based slot; twelve float words) annotates an already loaded RSP light. Ordinary light loads/color edits invalidate it. Vertex loads snapshot the annotation alongside original light values; light-set equivalence includes semantic values. No nearest-color/direction search is used to associate unrelated lights.
 
@@ -16,7 +19,7 @@ The first path enhances **bound sources**. It does not illuminate every surface 
 
 The existing conservative opaque BLAS/TLAS, primary SurfaceHit, world positions and call/depth validation are reused. No second scene or GI system. RT descriptors add u8 local output, t9 RSP lights and t10 RDP records. RGBA32F local output stores receiver world position in RGB; W is a bit container with seven 2-bit visibility values, ownership bits21–27 and bit30 to avoid denormal flushing. Raster t5/space3 uses an unfiltered Load. Disabled/failure paths use valid dummy descriptors and zero production enables. Explicit resource barriers and per-framebuffer lifetimes remain.
 
-TraceParams stays128 bytes, FramebufferParams80 and RDPParams336. SpatialFlags/modes.w bits0/1 remain AO/fill, bit2 enables locals, bits8+ select diagnostics. Local-only runs do not trace spatial rays. Each source uses a finite source segment; source radius0 uses one ray, nonzero radius requests three fixed source-sized samples. Sequential queries retain recursion depth1.
+TraceParams stays128 bytes, FramebufferParams is now112 (spatial GI/authority extension) and RDPParams336. SpatialFlags/modes.w bits0/1 remain AO/fill, bit2 enables locals, bits8+ select diagnostics. Local-only runs do not trace spatial rays. Each source uses a finite source segment; source radius0 uses one ray, nonzero radius requests three fixed source-sized samples. Sequential queries retain recursion depth1.
 
 Raster removes only accepted owned RSP terms and adds:
 

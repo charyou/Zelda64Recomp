@@ -114,6 +114,9 @@ namespace ultramodern {
             {"rt_spatial_bias", config.rt_spatial_bias},
             {"rt_authored_fill_budget", config.rt_authored_fill_budget},
             {"rt_ambient_floor", config.rt_ambient_floor},
+            {"rt_lighting_authority", config.rt_lighting_authority},
+            {"rt_spatial_local", config.rt_spatial_local},
+            {"rt_gi", config.rt_gi},
             {"rr_manual_value", config.rr_manual_value},
             {"developer_mode",  config.developer_mode},
         };
@@ -142,6 +145,9 @@ namespace ultramodern {
         config.rt_spatial_bias = from_or_default(j, "rt_spatial_bias", 0.10f);
         config.rt_authored_fill_budget = from_or_default(j, "rt_authored_fill_budget", 0.45f);
         config.rt_ambient_floor = from_or_default(j, "rt_ambient_floor", 0.35f);
+        config.rt_lighting_authority = from_or_default(j, "rt_lighting_authority", 1.0f);
+        config.rt_spatial_local = from_or_default(j, "rt_spatial_local", false);
+        config.rt_gi = from_or_default(j, "rt_gi", false);
         config.rr_manual_value  = from_or_default(j, "rr_manual_value", rr_manual_default);
         config.developer_mode   = from_or_default(j, "developer_mode",  developer_mode_default);
     }
@@ -389,6 +395,9 @@ void reset_graphics_options() {
     new_config.rt_spatial_bias = 0.10f;
     new_config.rt_authored_fill_budget = 0.45f;
     new_config.rt_ambient_floor = 0.35f;
+    new_config.rt_lighting_authority = 1.0f;
+    new_config.rt_spatial_local = false;
+    new_config.rt_gi = false;
     new_config.rr_manual_value = rr_manual_default;
     new_config.developer_mode = developer_mode_default;
     ultramodern::renderer::set_graphics_config(new_config);

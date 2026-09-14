@@ -221,6 +221,14 @@ RECOMP_PATCH void Play_Main(GameState* thisx) {
                 ((u32)this->lightCtx.ambientColor[1] << 8) | this->lightCtx.ambientColor[2],
             // Presentation evidence shapes a lobe, never asserts geometric sky access.
             // Skyless rooms retain isotropic authored room fill.
+            .primaryDirection = { this->envCtx.dirLight1.params.dir.x, this->envCtx.dirLight1.params.dir.y, this->envCtx.dirLight1.params.dir.z },
+            .primaryRGB = ((u32)this->envCtx.dirLight1.params.dir.color[0] << 16) |
+                ((u32)this->envCtx.dirLight1.params.dir.color[1] << 8) | this->envCtx.dirLight1.params.dir.color[2],
+            .secondaryDirection = { this->envCtx.dirLight2.params.dir.x, this->envCtx.dirLight2.params.dir.y, this->envCtx.dirLight2.params.dir.z },
+            .secondaryRGB = ((u32)this->envCtx.dirLight2.params.dir.color[0] << 16) |
+                ((u32)this->envCtx.dirLight2.params.dir.color[1] << 8) | this->envCtx.dirLight2.params.dir.color[2],
+            // Profile authorizes diffuse transport from verified real local sources.
+            .localBounceStrength = 0.75f,
             .skyFillWeight = naturalSky &&
                 this->roomCtx.curRoom.behaviorType1 == ROOM_BEHAVIOR_TYPE1_0 ? 1.0f : 0.0f,
         };

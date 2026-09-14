@@ -51,6 +51,11 @@ namespace zelda64 {
             float water_influence = 0.0f;
             uint32_t ambient_rgb = 0;
             float sky_fill_weight = 0.0f;
+            float primary_direction[3] = {};
+            uint32_t primary_rgb = 0;
+            float secondary_direction[3] = {};
+            uint32_t secondary_rgb = 0;
+            float local_bounce_strength = 0.0f;
         };
 
         void set_environment_fog(const EnvironmentFog& fog);

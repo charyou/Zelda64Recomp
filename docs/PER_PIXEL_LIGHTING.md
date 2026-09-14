@@ -1,5 +1,8 @@
 # Enhanced per-pixel lighting
 
+**2026-09-14:** Authored-light eligibility remains unchanged. Independent [spatial receiver traits](SPATIAL_LIGHTING.md) let suitable authored/unlit geometry receive bounded local/GI response. RT+ transfers supported ambient/fill responsibility; original directional and owned-local terms retain separate evaluation.
+
+
 The enhanced renderer evaluates the existing RSP ambient and directional lights on interpolated, normalized model normals. This smooths diffuse shading across character triangles without inventing lights, changing textures, adding specular highlights, or changing the N64 combiner/blender.
 
 Zelda enables it at startup. Set `ZELDA64RECOMP_LIGHTING=original` for legacy vertex lighting, or use the session-local checkbox in **F1 → Game editor → Lighting** when debug mode is enabled. The lighting selection is independent of fog mode. Native/RDRAM always uses original vertex lighting.

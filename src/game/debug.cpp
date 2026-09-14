@@ -34,6 +34,13 @@ extern "C" void recomp_get_pending_set_time(uint8_t* rdram, recomp_context* ctx)
                 unsigned day, hour, minute;
                 if (std::sscanf(value, "%u,%u,%u", &day, &hour, &minute) == 3 && day >= 1 && day <= 3 && hour < 24 && minute < 60) {
                     zelda64::set_time(day, hour, minute);
+                    // Optional one-shot entrance through the existing warp action.
+                    if (const char* entrance = std::getenv("ZELDA64RECOMP_DEV_ENTRANCE")) {
+                        char* end = nullptr;
+                        unsigned long code = std::strtoul(entrance, &end, 0);
+                        if (*entrance && end && !*end && code < 0xFFFF && (code & 15) == 0)
+                            pending_warp.store(static_cast<uint16_t>(code));
+                    }
                     fprintf(stderr, "[Dev time] Day %u, %02u:%02u\n", day, hour, minute);
                 }
             }

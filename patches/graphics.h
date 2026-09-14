@@ -42,6 +42,11 @@ typedef struct RecompEnvironmentFog {
     float waterInfluence;
     u32 ambientRGB;
     float skyFillWeight;
+    float primaryDirection[3];
+    u32 primaryRGB;
+    float secondaryDirection[3];
+    u32 secondaryRGB;
+    float localBounceStrength;
 } RecompEnvironmentFog;
 
 DECLARE_FUNC(void, recomp_set_environment_fog, RecompEnvironmentFog* fog);
