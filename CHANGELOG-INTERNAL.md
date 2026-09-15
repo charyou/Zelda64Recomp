@@ -1,5 +1,32 @@
 # Internal Changelog
 
+## 2026-09-15 — Lighting instrumentation corrections and Vulkan gate
+
+- Implemented and individually checked review findings F3–F6: inactive-path gating, clean bounded benchmark capture, bounded source-origin construction, and complete/honest schema-2 provenance, render-state and identity facts. The existing F1/F2 fixture was extended only where a runtime partial-task-coverage failure required it.
+- Focused F1–F6 fixture and affected-unit compilation passed, followed by a full patch/SPIR-V/DXIL/Vulkan+D3D12 build/link. Current executable SHA256 is `5B1B353CFBAC3DBE44363F89D2F0CD1080501C9A8D445D4AD94A1EDBCFAF4DB4`.
+- Final Vulkan/AMD snapshot and 16-sample clean benchmark passed. Real Vulkan two-entry rendering/writing and distinct-ID deterministic aggregation are qualified; a naturally produced distinct multi-Workload frame remains open because the current renderer creates one Workload per GameFrame. Other backend, rare semantic/mod, shader-hash and cache/present-context cases remain explicit non-gating gaps.
+- Stage 4 is unblocked for the current single-Workload Vulkan development path but was not started. No architecture, production lighting policy, shader ABI or production dependency on instrumentation-specific Plume behavior was introduced; public `CHANGELOG.md` remains unchanged under its release-note workflow.
+
+## 2026-09-15 — F1/F2 instrumentation correlation fixes
+
+- Fixed capture-generation isolation and process-unique wire tokens; stale retained evidence, delayed markers and old host callbacks cannot resolve a later session's publication state. Missing joins remain unavailable.
+- Separated parser task/list scope from frozen Workload evidence and fresh render sidecars. FullSync finalizes before queue publication; list calls/returns/branches retain correct scope. One capture now accounts for the complete render occurrence and batches all its Workloads.
+- Focused real-implementation fixture passed rearm/delayed-token isolation, immutable split/list scope, fresh repeated-render evidence and two-Workload/one-occurrence accounting with serialized results. Ten changed RT64 translation units compiled; no full game link or runtime qualification. Test source: `lib/rt64/tests/lighting_scope.cpp`; logs/artifacts: `_working-directory/diagnostics/2026-09-15-lighting-scope-fixes/`.
+- F3–F6 and the remaining runtime qualification matrix stay with Sol before Stage 4. No accepted-architecture, Plume, shader or production-lighting-policy change. Updated review and HANDOFF; historical executable remains unchanged.
+
+## 2026-09-15 — Lighting instrumentation trust review
+
+- Reviewed actual parent/RT64/Plume changes and recursively checked nested repository state; N64ModernRuntime and other nested dependencies are clean.
+- Added `docs/LIGHTING_INSTRUMENTATION_REVIEW.md`: Sol fixes required before Stage 4, with two blocking correlation/lifetime findings and four required correction groups. Existing benchmark artifacts confirm repeated-Workload configuration accumulation; current executable hash matches the implementation handoff.
+- Plume exact-range/status API is acceptable with follow-up and remains removable with the debug layer. No renderer architecture reopening, implementation changes, rebuild or runtime test; prior qualification gaps remain explicit.
+
+## 2026-09-15 — Lighting instrumentation Stages 1–3
+
+- Added a capture-only game/renderer correlation envelope with pre/post draw MM state, explicit OPA/XLU markers, fail-closed exact command association, list/execution/workload/render identity, bounded asynchronous JSON artifacts and explicit unavailable/truncated/drop states. Transition testing found same-address PlayState reuse; lifetime identity now also advances on `gameplayFrames` reset.
+- Added capture-only source attempts/receipts, RSP semantic lineage and production-branch receiver evidence without changing lighting eligibility, ownership, fallback or selection. Final Vulkan Town snapshot associated 18 annotations, recorded 210 attempts, two source groups and separately scoped 621 classifier plus 710 submitted-candidate rows with no truncation. Modified-color, cap/dummy and copied/replaced-mod cases remain unqualified; Stage 2 is partial.
+- Added bounded clean CPU/GPU performance capture and a generic exact-range/status timestamp API in Plume. Final 16-sample Vulkan/AMD benchmark used 12/128 queries and measured a 2.506 ms median whole Workload; disabled reconstruction and forced backend failure exported explicit non-measurement states. D3D12 compiles but lacks runtime qualification; Metal is unbuilt.
+- Full patch/SPIR-V/DXIL/Vulkan+D3D12 build passed; final executable SHA256 `E24A3539B0C04AA5AAEEED5C4EAF02E24D7D087C5490F87450AB81ED846E10B2`. Alternating timing-disabled PresentMon runs showed −0.012 ms mean FrameTime and +0.069 ms mean GPUTime versus the preserved pre-instrumentation executable. Stage 1 remains partial solely because multiple Workloads in one render occurrence were not observed; no Stage 4 work was started. Full evidence and remaining gates are in `HANDOFF.md` and `_working-directory/diagnostics/2026-09-15-lighting-instrumentation/`.
+
 ## 2026-09-14 — Spatial GI and RT+ authority
 
 - Added independent spatial receiver/provenance traits and source-authorized unowned direct while preserving Run-4 owned replacement. Monotonic textured and untextured SHADE share the boundary; sky/special/cutout/modified content remains excluded.

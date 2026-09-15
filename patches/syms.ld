@@ -54,3 +54,7 @@ recomp_destroy_actor_data = 0x8F0000CC;
 recomp_get_actor_data = 0x8F0000D0;
 recomp_get_actor_spawn_index = 0x8F0000D4;
 recomp_set_environment_fog = 0x8F0000D8;
+recomp_lighting_capture_begin = 0x8F0000DC;
+recomp_lighting_capture_post = 0x8F0000E0;
+recomp_lighting_capture_finalize = 0x8F0000E4;
+recomp_lighting_capture_is_armed = 0x8F0000E8;

@@ -671,6 +671,10 @@ int main(int argc, char** argv) {
     REGISTER_FUNC(recomp_get_inverted_axes);
     REGISTER_FUNC(recomp_get_analog_inverted_axes);
     REGISTER_FUNC(recomp_set_environment_fog);
+    REGISTER_FUNC(recomp_lighting_capture_begin);
+    REGISTER_FUNC(recomp_lighting_capture_post);
+    REGISTER_FUNC(recomp_lighting_capture_finalize);
+    REGISTER_FUNC(recomp_lighting_capture_is_armed);
     recompui::register_ui_exports();
     recomputil::register_data_api_exports();
 

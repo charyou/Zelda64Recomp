@@ -13,9 +13,137 @@
 #include "../patches/sound.h"
 #include "ultramodern/ultramodern.hpp"
 #include "ultramodern/config.hpp"
+#include "hle/rt64_lighting_instrumentation.h"
+#include "json/json.hpp"
 
 static_assert(sizeof(RecompAtmosphereOverride) == (11 * sizeof(uint32_t)));
 static_assert(sizeof(RecompEnvironmentFog) == (40 * sizeof(uint32_t)));
+static_assert((sizeof(RecompLightingGameSnapshot) % sizeof(uint32_t)) == 0);
+static_assert((sizeof(RecompLightingBindingFrame) % sizeof(uint32_t)) == 0);
+
+template <typename T>
+static T copy_recomp_words(uint8_t* rdram, gpr source) {
+    static_assert((sizeof(T) % sizeof(uint32_t)) == 0);
+    T result{};
+    uint32_t* words = reinterpret_cast<uint32_t*>(&result);
+    for (size_t i = 0; i < (sizeof(T) / sizeof(uint32_t)); i++) {
+        words[i] = MEM_W(i * sizeof(uint32_t), source);
+    }
+    return result;
+}
+
+static nlohmann::json lighting_vec3(const float values[3]) {
+    return nlohmann::json::array({ values[0], values[1], values[2] });
+}
+
+static nlohmann::json lighting_vec3i(const s32 values[3]) {
+    return nlohmann::json::array({ values[0], values[1], values[2] });
+}
+
+static nlohmann::json lighting_published_environment_json(const RecompLightingGameSnapshot& s) {
+    if (!s.publishedEnvironmentAvailable) {
+        return { { "status", "unavailable" }, { "reason", "environment_adapter_packet_not_published" } };
+    }
+    const RecompEnvironmentFog& e = s.publishedEnvironment;
+    return {
+        { "status", "observed" }, { "packet_schema", "RecompEnvironmentFog_v1" },
+        { "valid", e.valid != 0 }, { "rgb_u24", e.rgb }, { "fog_near", e.fogNear }, { "z_far", e.zFar },
+        { "sun_direction", { e.sunX, e.sunY, e.sunZ } },
+        { "camera_position", { e.cameraX, e.cameraY, e.cameraZ } },
+        { "view_direction", { e.viewX, e.viewY, e.viewZ } },
+        { "reference_height", e.referenceHeight },
+        { "weather", { { "outdoor", e.outdoor != 0 }, { "rain", e.rain != 0 }, { "snow", e.snow != 0 },
+            { "storm", e.storm != 0 }, { "expanded_outdoor", e.expandedOutdoor != 0 } } },
+        { "profile", {
+            { "override_mask", e.atmosphereOverrideMask }, { "base_height_blend", e.baseHeightBlend },
+            { "morning_height_blend", e.morningHeightBlend }, { "scale_height_fraction", e.scaleHeightFraction },
+            { "density_variation", e.densityVariation }, { "directional_scattering", e.directionalScattering },
+            { "saturated_fog_height_budget", e.saturatedFogHeightBudget },
+            { "clear_air_far_transmittance", e.clearAirFarTransmittance },
+            { "wet_air_far_transmittance", e.wetAirFarTransmittance }, { "water_influence", e.waterInfluence },
+            { "ambient_rgb_u24", e.ambientRGB }, { "sky_fill_weight", e.skyFillWeight },
+            { "primary_direction", { e.primaryDirection[0], e.primaryDirection[1], e.primaryDirection[2] } },
+            { "primary_rgb_u24", e.primaryRGB },
+            { "secondary_direction", { e.secondaryDirection[0], e.secondaryDirection[1], e.secondaryDirection[2] } },
+            { "secondary_rgb_u24", e.secondaryRGB }, { "local_bounce_strength", e.localBounceStrength }
+        } }
+    };
+}
+
+static nlohmann::json lighting_game_json(const RecompLightingGameSnapshot& s) {
+    nlohmann::json nodes = nlohmann::json::array();
+    for (uint32_t i = 0; i < std::min<uint32_t>(s.nodeCount, RECOMP_LIGHTING_CAPTURE_MAX_NODES); i++) {
+        const RecompLightingNodeSnapshot& node = s.nodes[i];
+        nodes.push_back({
+            { "ordinal", node.ordinal }, { "type", node.type },
+            { "position_or_direction", { node.x, node.y, node.z } },
+            { "radius", node.radius }, { "positive_range", node.radius > 0 },
+            { "rgb_u24", node.rgb }, { "glow", node.glow != 0 },
+            { "environment_directional_1", node.environment1 != 0 },
+            { "environment_directional_2", node.environment2 != 0 },
+            { "provenance", (node.environment1 || node.environment2) ? "environment_directional" : "unknown" }
+        });
+    }
+
+    return {
+        { "schema_version", s.schemaVersion }, { "status", "observed" },
+        { "phase", s.phase == 0 ? "pre_draw" : "post_draw" },
+        { "identity", { { "play_epoch", s.playEpoch }, { "gameplay_frame", s.gameplayFrame } } },
+        { "location", {
+            { "scene_id", s.sceneId }, { "scene_layer", s.sceneLayer }, { "saved_entrance", s.savedEntrance },
+            { "current_spawn", s.curSpawn }, { "requested_next_entrance", s.nextEntrance },
+            { "transition_trigger", s.transitionTrigger }, { "transition_type", s.transitionType },
+            { "transition_mode", s.transitionMode }, { "current_room", s.currentRoom },
+            { "previous_room", s.previousRoom }, { "room_load_status", s.roomLoadStatus },
+            { "current_room_segment_valid", s.currentRoomSegmentValid != 0 },
+            { "previous_room_segment_valid", s.previousRoomSegmentValid != 0 },
+            { "current_room_enable_pos_lights", s.currentRoomEnablePosLights != 0 },
+            { "current_room_behavior_1", s.currentRoomBehavior1 }, { "current_room_behavior_2", s.currentRoomBehavior2 }
+        } },
+        { "mode_cinematic", {
+            { "active_gamestate", "PlayState" }, { "game_mode", s.gameMode }, { "cutscene_state", s.cutsceneState },
+            { "cutscene_frame", s.cutsceneFrame }, { "cutscene_script_index", s.cutsceneScriptIndex },
+            { "saved_cutscene_index", s.savedCutsceneIndex }, { "current_cutscene_id", s.currentCutsceneId },
+            { "play_in_cutscene", s.playInCutscene != 0 }
+        } },
+        { "clocks_weather", {
+            { "day_raw", s.dayRaw }, { "current_day", s.currentDay }, { "current_time", s.currentTime },
+            { "skybox_time", s.skyboxTime }, { "scene_time_speed", s.sceneTimeSpeed },
+            { "weather_mode", s.weatherMode }, { "storm_request", s.stormRequest }, { "storm_state", s.stormState },
+            { "lightning_state", s.lightningState }, { "precipitation", s.precipitation }
+        } },
+        { "environment_selection", {
+            { "light_mode", s.lightMode }, { "light_config", s.lightConfig },
+            { "change_next_config", s.changeLightNextConfig }, { "change_enabled", s.changeLightEnabled != 0 },
+            { "change_timer", s.changeLightTimer }, { "change_duration", s.changeDuration },
+            { "blend_enabled", s.lightBlendEnabled != 0 }, { "light_setting", s.lightSetting },
+            { "previous_light_setting", s.previousLightSetting }, { "setting_override", s.lightSettingOverride },
+            { "blend_rate_override", s.lightBlendRateOverride }, { "blend", s.lightBlend },
+            { "blend_override", s.lightBlendOverride }
+        } },
+        { "environment_values", {
+            { "adjustments", s.adjustment }, { "resolved_settings", s.resolvedLightSettings },
+            { "ambient_rgb_u24", s.ambientRGB }, { "fog_rgb_u24", s.fogRGB },
+            { "fog_near", s.fogNear }, { "z_far", s.zFar },
+            { "primary_direction", lighting_vec3i(s.primaryDirection) }, { "primary_rgb_u24", s.primaryRGB },
+            { "secondary_direction", lighting_vec3i(s.secondaryDirection) }, { "secondary_rgb_u24", s.secondaryRGB },
+            { "sun_position", lighting_vec3(s.sunPosition) }
+        } },
+        { "adapter_published_environment", lighting_published_environment_json(s) },
+        { "spatial", {
+            { "camera_eye", lighting_vec3(s.cameraEye) }, { "camera_at", lighting_vec3(s.cameraAt) },
+            { "camera_up", lighting_vec3(s.cameraUp) }, { "player_position", lighting_vec3(s.playerPosition) },
+            { "player_rotation", lighting_vec3i(s.playerRotation) }
+        } },
+        { "light_context", {
+            { "status", s.nodeCycleDetected ? "malformed" : (s.nodeDropped ? "truncated" : (s.phase == 0 ? "observed" : "not_evaluated")) },
+            { "reason", s.phase == 0 ? nullptr : nlohmann::json("post_phase_does_not_rescan") },
+            { "observed_count", s.nodeCount }, { "dropped", s.nodeDropped },
+            { "cycle_detected", s.nodeCycleDetected != 0 }, { "malformed", s.nodeMalformed != 0 },
+            { "nodes", std::move(nodes) }
+        } }
+    };
+}
 
 extern "C" void recomp_update_inputs(uint8_t* rdram, recomp_context* ctx) {
     recomp::poll_inputs();
@@ -235,4 +363,142 @@ extern "C" void recomp_set_environment_fog(uint8_t* rdram, recomp_context* ctx) 
         .secondary_rgb = MEM_W(38 * sizeof(u32), fog),
         .local_bounce_strength = read_float(39),
     });
+}
+
+extern "C" void recomp_lighting_capture_is_armed(uint8_t* rdram, recomp_context* ctx) {
+    RT64::LightingInstrumentation& instrumentation = RT64::LightingInstrumentation::instance();
+    _return<u32>(ctx, instrumentation.detailedCapture() ? 1U : (instrumentation.benchmarkCapture() ? 2U : 0U));
+}
+
+extern "C" void recomp_lighting_capture_begin(uint8_t* rdram, recomp_context* ctx) {
+    if (!RT64::LightingInstrumentation::instance().armed()) {
+        _return<u32>(ctx, 0);
+        return;
+    }
+    const gpr address = _arg<0, PTR(u32)>(rdram, ctx);
+    const RecompLightingGameSnapshot snapshot = copy_recomp_words<RecompLightingGameSnapshot>(rdram, address);
+    if (snapshot.schemaVersion != RECOMP_LIGHTING_CAPTURE_SCHEMA) {
+        _return<u32>(ctx, 0);
+        return;
+    }
+    _return<u32>(ctx, RT64::LightingInstrumentation::instance().publishGamePre(lighting_game_json(snapshot).dump()));
+}
+
+extern "C" void recomp_lighting_capture_post(uint8_t* rdram, recomp_context* ctx) {
+    if (!RT64::LightingInstrumentation::instance().armed()) {
+        return;
+    }
+    const u32 token = _arg<0, u32>(rdram, ctx);
+    const gpr address = _arg<1, PTR(u32)>(rdram, ctx);
+    const RecompLightingGameSnapshot snapshot = copy_recomp_words<RecompLightingGameSnapshot>(rdram, address);
+    if (snapshot.schemaVersion == RECOMP_LIGHTING_CAPTURE_SCHEMA) {
+        RT64::LightingInstrumentation::instance().publishGamePost(token, lighting_game_json(snapshot).dump());
+    }
+}
+
+extern "C" void recomp_lighting_capture_finalize(uint8_t* rdram, recomp_context* ctx) {
+    if (!RT64::LightingInstrumentation::instance().detailedCapture()) {
+        return;
+    }
+    const gpr address = _arg<0, PTR(u32)>(rdram, ctx);
+    const RecompLightingBindingFrame frame = copy_recomp_words<RecompLightingBindingFrame>(rdram, address);
+    if ((frame.schemaVersion != RECOMP_LIGHTING_CAPTURE_SCHEMA) || (frame.token == 0)) {
+        return;
+    }
+
+    nlohmann::json attempts = nlohmann::json::array();
+    std::array<uint32_t, 5> outcomes = {};
+    const uint32_t attemptCount = std::min<uint32_t>(frame.attemptCount, RECOMP_LIGHTING_CAPTURE_MAX_ATTEMPTS);
+    for (uint32_t i = 0; i < attemptCount; i++) {
+        const RecompLightingBindAttempt& attempt = frame.attempts[i];
+        if (attempt.outcome < outcomes.size()) outcomes[attempt.outcome]++;
+        const char* outcome = "unknown";
+        switch (attempt.outcome) {
+        case 1: outcome = "bound_verified"; break;
+        case 2: outcome = "bound_unverified"; break;
+        case 3: outcome = "not_bound"; break;
+        case 4: outcome = "unsupported_type"; break;
+        }
+        nlohmann::json parameters;
+        if (!attempt.parametersObserved) {
+            parameters = { { "status", "unavailable" }, { "reason", "parameters_not_observed" } };
+        }
+        else if (attempt.parameterKind == 1) {
+            parameters = { { "status", "observed" }, { "kind", "point" },
+                { "position", { attempt.x, attempt.y, attempt.z } }, { "radius", attempt.radius }, { "rgb_u24", attempt.rgb } };
+        }
+        else if (attempt.parameterKind == 2) {
+            parameters = { { "status", "observed" }, { "kind", "directional" },
+                { "direction", { attempt.direction[0], attempt.direction[1], attempt.direction[2] } },
+                { "rgb_u24", attempt.directionRGB } };
+        }
+        else {
+            parameters = { { "status", "unavailable" }, { "reason", "unsupported_parameter_kind" },
+                { "kind_value", attempt.parameterKind } };
+        }
+        attempts.push_back({
+            { "bind_ordinal", attempt.bindOrdinal }, { "attempt_ordinal", attempt.attemptOrdinal },
+            { "type", attempt.type }, { "positional_mode", attempt.positionalMode != 0 },
+            { "reference", attempt.refPresent ? nlohmann::json::array({ attempt.refPosition[0], attempt.refPosition[1], attempt.refPosition[2] }) : nlohmann::json(nullptr) },
+            { "parameters", std::move(parameters) },
+            { "initial_slots", attempt.initialSlots }, { "before_slots", attempt.beforeSlots }, { "after_slots", attempt.afterSlots },
+            { "preexisting_full_slots", attempt.preexistingFullSlots != 0 },
+            { "returned_slot", attempt.returnedSlot == UINT32_MAX ? nlohmann::json(nullptr) : nlohmann::json(attempt.returnedSlot) },
+            { "owns_point", attempt.ownsPoint != 0 }, { "outcome", outcome },
+            { "not_bound_reason", attempt.outcome == 3 ? nlohmann::json("not_bound_reason_unobserved") : nlohmann::json(nullptr) }
+        });
+    }
+
+    nlohmann::json drawEvents = nlohmann::json::array();
+    const uint32_t drawEventCount = std::min<uint32_t>(frame.drawEventCount, RECOMP_LIGHTING_CAPTURE_MAX_DRAW_EVENTS);
+    for (uint32_t i = 0; i < drawEventCount; i++) {
+        const RecompLightingDrawReceiptEvent& event = frame.drawEvents[i];
+        drawEvents.push_back({
+            { "draw_ordinal", event.drawOrdinal },
+            { "bind_ordinal", event.bindOrdinal == UINT32_MAX ? nlohmann::json(nullptr) : nlohmann::json(event.bindOrdinal) },
+            { "num_lights", event.numLights }, { "receipt_found", event.receiptFound != 0 },
+            { "receipt_equal", event.receiptEqual != 0 }, { "receipt_consumed", event.receiptConsumed != 0 },
+            { "receipt_reused_or_mismatched", event.receiptReusedOrMismatched != 0 },
+            { "annotated_source_slots", event.annotatedSourceSlots }
+        });
+    }
+
+    nlohmann::json bindingJson = {
+        { "schema_version", frame.schemaVersion },
+        { "status", frame.attemptDropped || frame.drawEventDropped || frame.emissionDropped ? "truncated" : "observed" },
+        { "bind_count", frame.bindCount }, { "bind_dropped", frame.bindDropped },
+        { "attempt_count", frame.attemptCount }, { "attempt_dropped", frame.attemptDropped },
+        { "receipt", {
+            { "capacity", frame.receiptCapacity }, { "created", frame.receiptCount }, { "overflow", frame.receiptOverflow },
+            { "invalidated", frame.receiptInvalidated }, { "found", frame.receiptFound }, { "equal", frame.receiptEqual },
+            { "consumed", frame.receiptConsumed }, { "reused_or_mismatched", frame.receiptReusedOrMismatched }
+        } },
+        { "outcome_aggregates", {
+            { "unknown", outcomes[0] }, { "bound_verified", outcomes[1] }, { "bound_unverified", outcomes[2] },
+            { "not_bound", outcomes[3] }, { "unsupported_type", outcomes[4] }
+        } },
+        { "attempts", std::move(attempts) },
+        { "draw_events", { { "observed", frame.drawCount }, { "retained", frame.drawEventCount },
+            { "dropped", frame.drawEventDropped }, { "events", std::move(drawEvents) } } },
+        { "emissions", { { "observed", frame.emissionCount }, { "dropped", frame.emissionDropped } } }
+    };
+
+    std::vector<RT64::LightingAnnotationSidecar> sidecars;
+    const uint32_t emissionCount = std::min<uint32_t>(frame.emissionCount, RECOMP_LIGHTING_CAPTURE_MAX_EMISSIONS);
+    sidecars.reserve(emissionCount);
+    for (uint32_t i = 0; i < emissionCount; i++) {
+        const RecompLightingAnnotationEmission& source = frame.emissions[i];
+        RT64::LightingAnnotationSidecar sidecar;
+        sidecar.token = source.token;
+        sidecar.rdramAddress = source.rdramAddress;
+        sidecar.stream = source.stream;
+        sidecar.slot = source.slot;
+        sidecar.bindOrdinal = source.bindOrdinal;
+        std::copy(std::begin(source.commandWords), std::end(source.commandWords), sidecar.commandWords.begin());
+        std::copy(std::begin(source.payloadWords), std::end(source.payloadWords), sidecar.payloadWords.begin());
+        sidecars.emplace_back(sidecar);
+    }
+
+    RT64::LightingInstrumentation::instance().finalizeBindings(frame.token, bindingJson.dump(), std::move(sidecars),
+        frame.opaMarkerEmitted != 0, frame.xluMarkerEmitted != 0);
 }

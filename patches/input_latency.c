@@ -237,6 +237,13 @@ RECOMP_PATCH void Graph_TaskSet00(GraphicsContext* gfxCtx, GameState* gameState)
 
     scTask->framebuffer = cfb;
 
+    // Freeze capture-only binding evidence after all display-list callbacks and
+    // before the task can be submitted. This hook never changes task contents.
+    {
+        extern void recomp_lighting_capture_finalize_task(void);
+        recomp_lighting_capture_finalize_task();
+    }
+
     while (gfxCtx->queue.validCount != 0) {
         osRecvMesg(&gfxCtx->queue, NULL, OS_MESG_NOBLOCK);
     }

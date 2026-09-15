@@ -233,6 +233,12 @@ RECOMP_PATCH void Play_Main(GameState* thisx) {
                 this->roomCtx.curRoom.behaviorType1 == ROOM_BEHAVIOR_TYPE1_0 ? 1.0f : 0.0f,
         };
         recomp_set_environment_fog(&fog);
+        // Capture publication is deliberately after the resolved environment bridge
+        // and before either draw stream. Preserve the exact packet passed to the adapter.
+        {
+            extern void recomp_lighting_capture_begin_play(PlayState* play, RecompEnvironmentFog* environment);
+            recomp_lighting_capture_begin_play(this, &fog);
+        }
     }
 
     {
@@ -243,6 +249,11 @@ RECOMP_PATCH void Play_Main(GameState* thisx) {
         }
         Play_Draw(this);
         *CONTROLLER1(&this->state) = input;
+    }
+
+    {
+        extern void recomp_lighting_capture_end_play(PlayState* play);
+        recomp_lighting_capture_end_play(this);
     }
 
     CutsceneManager_Update();
