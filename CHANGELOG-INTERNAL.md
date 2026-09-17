@@ -1,5 +1,12 @@
 # Internal Changelog
 
+## 2026-09-17 — Lighting instrumentation Stage 4 closure
+
+- Implemented exact-occurrence cropped native GPU snapshots and labeled previews for existing visibility, spatial/local/direct/GI/reconstruction/output and supported raster targets; bounded staging/writer ownership retires through existing completion without telemetry submissions or waits. Vulkan Plume fixes supply generic image-to-buffer copy and noncoherent readback invalidation.
+- Added observational production-value normal/validity/composition views10–24 with no raster varying ABI expansion. Completed all16 compact Clock Town captures; reused established held-Workload/native-bit/pick-mapping and production-value qualification. GI-disabled and invalid-crop paths explicitly fail closed without fabricated files.
+- Clean Vulkan benchmark completed16 samples/96 production intervals with no Stage-4 artifacts or reported resource growth. Instrumentation-off smoke rendered normally without capture evidence. Final full target build and all three repository diff checks passed; final executable SHA256 `DA7602CFEF70B44CCEFADCCD4DEE0F5151FDCB09931DED1FD33B8C02AC1CCB1A`. Earlier successful fixtures and shader qualification were not repeated at closure.
+- Stage4 is development-ready on current single-Workload Vulkan; Stage5 is unblocked but not started. MSAA raster/Metal readback fail closed; D3D12 runtime, broad platform/mod/HFR and natural distinct multi-Workload qualification remain open. No human-assisted state, new ADR or Astra review needed. HANDOFF and docs/LIGHTING_INSTRUMENTATION_STAGE4.md record artifacts/reproduction/limits; dated reviews and generated release changelog remain unchanged.
+
 ## 2026-09-15 — Lighting instrumentation corrections and Vulkan gate
 
 - Implemented and individually checked review findings F3–F6: inactive-path gating, clean bounded benchmark capture, bounded source-origin construction, and complete/honest schema-2 provenance, render-state and identity facts. The existing F1/F2 fixture was extended only where a runtime partial-task-coverage failure required it.
