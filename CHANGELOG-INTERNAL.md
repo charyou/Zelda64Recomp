@@ -1,5 +1,12 @@
 # Internal Changelog
 
+## 2026-09-22 — Source permission beyond historical ownership; RT+ master override
+
+- ADR-013 keeps exact owned Primary replacement and permits bounded gain-minus-one response on explicitly authorized, validated unowned spatial receivers. No unknown SHADE subtraction, full duplicate source, new energy curve, GI change or extra ray pass. MM grants default-zero generic color-W permission; shader/layout sizes stay unchanged. Existing Local permission/ownership distinction, Secondary and ambient equations remain intact.
+- Added session expansion A/B and views30/31, plus F9 master effective fallback for RT lighting, GI/fill, fog, per-pixel and cutout enhancements. Requested feature values survive OFF/ON; baseline MSAA/presentation/mod settings stay configured. Corrected one-frame master restoration and no-consumer RT submission. Full affected DXIL/SPIR-V and CPU builds pass;128-byte layout/reflection agrees.
+- Complete16-state Town/Inn captures verify exclusive owned replacement, broader receiver execution, zero blocked increments, exact expansion-disable/master-restoration raster and unchanged GI/local/spatial buffers. Positive unowned final composition was exposed with the existing visibility-off Inn diagnostic; no broad natural coverage claim. Clean16-sample benchmark: .68406ms whole/.17510ms fused RT medians, no resource growth. Larger initial capture had writer-busy drops.
+- Physical F9 delivery remains unqualified: available keyboard injection also failed for F1/Escape. Native/fog/MSAA endpoints, missing sources/ambiguous matches and mode64-only are structural checks here. Handoff/contracts record limitations and reproduction. No commits; generated release changelog untouched. Release-note summary: Enhanced can apply bounded semantic Primary influence beyond historical light-slot coverage; session master A/B preserves individual settings.
+
 ## 2026-09-22 — Explicit primary environment direct responsibility
 
 - Added shared bounded primary interpretation for raster and GI: resolved authored RGB remains palette/environment energy reference, Enhanced may reach 2x, and Direct authority 0 restores authored magnitude. Unique historical contribution ownership prevents duplicate direct; missing/ambiguous states retain fallback. No new game semantics, solar policy, visibility pass, physical-lighting or framebuffer compensation.

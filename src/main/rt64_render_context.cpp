@@ -406,6 +406,8 @@ zelda64::renderer::RT64Context::RT64Context(uint8_t* rdram, ultramodern::rendere
     app->workloadQueue->rtGI = cur_config.rt_gi;
     if (const char* v = std::getenv("RT64_LIGHTING_AUTHORITY")) app->workloadQueue->lightingAuthority = std::clamp(std::strtof(v, nullptr), 0.0f, 1.0f);
     if (const char* v = std::getenv("RT64_PRIMARY_DIRECT")) app->workloadQueue->rtPrimaryDirect = std::atoi(v) != 0;
+    if (const char* v = std::getenv("RT64_PRIMARY_EXPANSION")) app->workloadQueue->rtPrimaryExpansion = std::atoi(v) != 0;
+    if (const char* v = std::getenv("RT64_RT_PLUS_MASTER")) app->workloadQueue->rtPlusMasterOff = std::atoi(v) == 0;
     if (const char* v = std::getenv("RT64_PRIMARY_DIRECT_AUTHORITY")) app->workloadQueue->primaryDirectAuthority = std::clamp(std::strtof(v, nullptr), -1.0f, 1.0f);
     if (const char* v = std::getenv("RT64_GI_LOCAL_CANDIDATES")) app->workloadQueue->giLocalCandidates = std::clamp(std::atoi(v), 0, 2);
     if (const char* v = std::getenv("RT64_RT_SPATIAL_LOCAL")) app->workloadQueue->rtSpatialLocal = std::atoi(v) != 0;
@@ -413,7 +415,7 @@ zelda64::renderer::RT64Context::RT64Context(uint8_t* rdram, ultramodern::rendere
     if (const char* v = std::getenv("RT64_RT_GI_RAW")) app->workloadQueue->rtGIRaw = std::atoi(v) != 0;
     const char* localOverride = std::getenv("RT64_RT_LOCAL_LIGHTS");
     app->workloadQueue->rtLocalLights = localOverride ? std::strcmp(localOverride, "1") == 0 : cur_config.rt_local_lights;
-    if (const char* view = std::getenv("RT64_LIGHTING_DEBUG")) app->workloadQueue->lightingDebug = std::clamp(std::atoi(view), 0, 29);
+    if (const char* view = std::getenv("RT64_LIGHTING_DEBUG")) app->workloadQueue->lightingDebug = std::clamp(std::atoi(view), 0, 31);
     const char* aoOverride = std::getenv("RT64_RT_AO");
     app->workloadQueue->rtAO = aoOverride ? std::strcmp(aoOverride, "1") == 0 : cur_config.rt_ao;
     const char* shadowOverride = std::getenv("RT64_RT_SHADOWS");
@@ -485,6 +487,9 @@ void zelda64::renderer::RT64Context::send_dl(const OSTask* task) {
     atmosphere.environmentDirection[1] = { environment.secondary_direction[0], environment.secondary_direction[1], environment.secondary_direction[2], 0.0f };
     auto resolvedColor = [](uint32_t rgb) { return hlslpp::float4(float((rgb >> 16) & 255)/255, float((rgb >> 8) & 255)/255, float(rgb & 255)/255, 0); };
     atmosphere.environmentColor[0] = resolvedColor(environment.primary_rgb);
+    // Profile permission for bounded additional Primary response on validated spatial receivers.
+    // Historical matching alone authorizes decomposition/replacement.
+    atmosphere.environmentColor[0].w = 0.35f;
     atmosphere.environmentColor[1] = resolvedColor(environment.secondary_rgb);
     atmosphere.localBounceStrength = std::clamp(environment.local_bounce_strength, 0.0f, 1.0f);
     atmosphere.fogColor = hlslpp::float4(
