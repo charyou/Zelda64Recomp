@@ -245,6 +245,7 @@ void set_application_user_config(RT64::Application* application, const ultramode
         application->workloadQueue->authoredFillBudget = config.rt_authored_fill_budget;
         application->workloadQueue->ambientFloor = config.rt_ambient_floor;
         application->workloadQueue->lightingAuthority = config.rt_lighting_authority;
+        application->workloadQueue->rtPrimaryDirect = config.rt_primary_direct;
         application->workloadQueue->rtSpatialLocal = config.rt_spatial_local;
         application->workloadQueue->rtGI = config.rt_gi;
     }
@@ -400,15 +401,19 @@ zelda64::renderer::RT64Context::RT64Context(uint8_t* rdram, ultramodern::rendere
     app->workloadQueue->authoredFillBudget = cur_config.rt_authored_fill_budget;
     app->workloadQueue->ambientFloor = cur_config.rt_ambient_floor;
     app->workloadQueue->lightingAuthority = cur_config.rt_lighting_authority;
+    app->workloadQueue->rtPrimaryDirect = cur_config.rt_primary_direct;
     app->workloadQueue->rtSpatialLocal = cur_config.rt_spatial_local;
     app->workloadQueue->rtGI = cur_config.rt_gi;
     if (const char* v = std::getenv("RT64_LIGHTING_AUTHORITY")) app->workloadQueue->lightingAuthority = std::clamp(std::strtof(v, nullptr), 0.0f, 1.0f);
+    if (const char* v = std::getenv("RT64_PRIMARY_DIRECT")) app->workloadQueue->rtPrimaryDirect = std::atoi(v) != 0;
+    if (const char* v = std::getenv("RT64_PRIMARY_DIRECT_AUTHORITY")) app->workloadQueue->primaryDirectAuthority = std::clamp(std::strtof(v, nullptr), -1.0f, 1.0f);
+    if (const char* v = std::getenv("RT64_GI_LOCAL_CANDIDATES")) app->workloadQueue->giLocalCandidates = std::clamp(std::atoi(v), 0, 2);
     if (const char* v = std::getenv("RT64_RT_SPATIAL_LOCAL")) app->workloadQueue->rtSpatialLocal = std::atoi(v) != 0;
     if (const char* v = std::getenv("RT64_RT_GI")) app->workloadQueue->rtGI = std::atoi(v) != 0;
     if (const char* v = std::getenv("RT64_RT_GI_RAW")) app->workloadQueue->rtGIRaw = std::atoi(v) != 0;
     const char* localOverride = std::getenv("RT64_RT_LOCAL_LIGHTS");
     app->workloadQueue->rtLocalLights = localOverride ? std::strcmp(localOverride, "1") == 0 : cur_config.rt_local_lights;
-    if (const char* view = std::getenv("RT64_LIGHTING_DEBUG")) app->workloadQueue->lightingDebug = std::clamp(std::atoi(view), 0, 24);
+    if (const char* view = std::getenv("RT64_LIGHTING_DEBUG")) app->workloadQueue->lightingDebug = std::clamp(std::atoi(view), 0, 29);
     const char* aoOverride = std::getenv("RT64_RT_AO");
     app->workloadQueue->rtAO = aoOverride ? std::strcmp(aoOverride, "1") == 0 : cur_config.rt_ao;
     const char* shadowOverride = std::getenv("RT64_RT_SHADOWS");

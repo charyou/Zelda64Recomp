@@ -1,5 +1,12 @@
 # Internal Changelog
 
+## 2026-09-22 — Explicit primary environment direct responsibility
+
+- Added shared bounded primary interpretation for raster and GI: resolved authored RGB remains palette/environment energy reference, Enhanced may reach 2x, and Direct authority 0 restores authored magnitude. Unique historical contribution ownership prevents duplicate direct; missing/ambiguous states retain fallback. No new game semantics, solar policy, visibility pass, physical-lighting or framebuffer compensation.
+- Added persistent rt_primary_direct (default true within Enhanced), session F1 Direct override, source/visibility/authority views 25–29, and GI local candidate budget 0–2. FramebufferParams is 128 bytes with explicit offset assertions and matching DXIL reflection; all affected DXIL/SPIR-V shaders and full executable rebuilt successfully.
+- Held noon/night Vulkan sequences each captured 16 states without drops: meaningful daylight/intermediate response, 2x isolated primary, zero blocked direct, unchanged ambient/visibility/local responsibilities, weak night unchanged in final crop, and effective GI contributor-budget reduction. Actual F1 toggle/budget checked. Initial full-size writer drops and desktop-launch requirement recorded honestly; camera/culling/cadence/reconstruction issues remain untouched.
+- ADR-012 and docs/PRIMARY_ENVIRONMENT_DIRECT.md record the reusable ownership boundary and evidence. Clean 16-sample authority A/B showed no traversal addition or resource growth (whole-workload medians 0.9492/0.9006 ms; not a speedup claim). No commits or upstream submission; generated release changelog left to its release workflow.
+
 ## 2026-09-17 — Lighting instrumentation Stage 4 closure
 
 - Implemented exact-occurrence cropped native GPU snapshots and labeled previews for existing visibility, spatial/local/direct/GI/reconstruction/output and supported raster targets; bounded staging/writer ownership retires through existing completion without telemetry submissions or waits. Vulkan Plume fixes supply generic image-to-buffer copy and noncoherent readback invalidation.
@@ -39,7 +46,7 @@
 - Added independent spatial receiver/provenance traits and source-authorized unowned direct while preserving Run-4 owned replacement. Monotonic textured and untextured SHADE share the boundary; sky/special/cutout/modified content remains excluded.
 - Added bounded four-sample one-bounce diffuse transport from explicit authored primary/secondary environment sources and two relevant verified local sources selected per receiver. Separate raw radiance/hit-distance and depth/normal guides feed a replaceable spatial reconstruction backend; no temporal/vendor integration.
 - RT+ transfers supported ambient/fill responsibility using reconstruction confidence, finite enclosure/contact and bounded transport. Primary direct direction+RGB visibility and secondary direct remain distinct; invalid responsibilities retain their authored fallback.
-- Build2/3 Vulkan Inn/Town checks: authored-color room participation, raw/reconstructed noise reduction, matched authority0/1 visible difference, and separate unowned floor / owned Link+stall local-direct signals. Coarse world-cell checkerboard removed. Final build4 passes and runs in daylight; exact artifacts, loaded-scene caveat and limits in HANDOFF.md. Evidence in _working-directory/diagnostics/2026-09-14-spatial-gi.
+- Build2/3 Vulkan Inn/Town checks: authored-color room participation, raw/reconstructed noise reduction, matched authority 0/1 visible difference, and separate unowned floor / owned Link+stall local-direct signals. Coarse world-cell checkerboard removed. Final build4 passes and runs in daylight; exact artifacts, loaded-scene caveat and limits in HANDOFF.md. Evidence in _working-directory/diagnostics/2026-09-14-spatial-gi.
 - F1/JSON/launch controls, one-shot developer entrance and ADR-011 documented. Limits: opaque subset, draw-level tint proxy, capped verified bound snapshots rather than full scene source publication, spatial-only denoising and incomplete motion qualification. Generated CHANGELOG.md retained per release workflow.
 
 > Konvention: Neueste Session oben, detailliert (Änderungen + Erkenntnisse).
