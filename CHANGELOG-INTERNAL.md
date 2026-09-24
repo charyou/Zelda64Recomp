@@ -1,5 +1,11 @@
 # Internal Changelog
 
+## 2026-09-24 — RT+ architecture reassessment (review only)
+
+- Reviewed committed parent 8893d4a / RT64 ccb86d2 / Plume 91e6711 against stock RT64 5473732 (upstream main only 2 commits ahead). Responsibility/ownership-vs-permission model, per-responsibility fallback, receiver rejection and shared scene judged durable. Main risk is underneath: per-replay RT scene without identity (stock matching/velocity unused), source availability defined by RSP binding, and missing visibility authority for environment directionals (night primary points below horizon yet is shadow-traced; secondary never is).
+- Concrete unfixed defects: primary rays cover GL NDC z 0..0.99 only (~20..1.3–1.7k units receivers); RasterPS 1/SV_Position.w likely wrong on D3D12; Workload metadata lost after mid-task FullSync; environment packet stale outside Play. Default expansion is unshadowed when rt_shadows is off. None qualified as opportunistic fixes.
+- Report and WP1–WP5 in docs/reviews/RT_PLUS_ARCHITECTURE_REASSESSMENT_2026-09-24.md. No code, ADR or public changelog changes.
+
 ## 2026-09-22 — Source permission beyond historical ownership; RT+ master override
 
 - ADR-013 keeps exact owned Primary replacement and permits bounded gain-minus-one response on explicitly authorized, validated unowned spatial receivers. No unknown SHADE subtraction, full duplicate source, new energy curve, GI change or extra ray pass. MM grants default-zero generic color-W permission; shader/layout sizes stay unchanged. Existing Local permission/ownership distinction, Secondary and ambient equations remain intact.
