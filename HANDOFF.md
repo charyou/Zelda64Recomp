@@ -1,34 +1,58 @@
-# Handoff — source responsibility after ADR-012, 2026-09-22
+# Handoff — RT scene coverage and primary visibility authority, 2026-09-24
 
-## Implemented contract
+## Current state
 
-ADR-013 separates modern source permission from historical decomposition. Primary retains exact ADR-012 unique-slot replacement. A valid source can additionally influence existing supported, RT identity/depth-validated spatial receivers with zero historical matches when the adapter explicitly grants permission. Ambiguous matches and positional fallback remain conservative. Unknown authored contribution is never subtracted. Unowned response uses only ADR-012 gain-minus-one, profile permission, diffuse response, .15 scalar peak cap and scalar remaining-SHADE headroom. Source hue remains intact; SHADE is appearance, not albedo. Visibility blocks only this increment. No new ray class/pass, source-energy equation, GI transport, varying or buffer size.
+Uncommitted, commit-ready changes on top of parent `bff648c` / RT64 `ccb86d2` / Plume `91e6711`. The parent gitlink `lib/rt64` shows as modified; Plume and N64ModernRuntime are unchanged. The basis is `docs/reviews/RT_PLUS_ARCHITECTURE_REASSESSMENT_2026-09-24.md`; new durable decisions are ADR-014 and ADR-015 (plus an ADR-004 amendment).
 
-MM adapter sets primary color W=.35; default-zero generic permission is safe for other games. FramebufferParams lightingAuthority.z carries effective permission; mode bit64 reuses spatial identity/normal guides. Locals already implement the same distinction and keep their response/exclusion math. Secondary has no published unowned raster permission/incremental contract and stays unchanged. Ambient retains independent confidence-weighted fill transfer. See docs/PRIMARY_ENVIRONMENT_DIRECT.md and docs/SPATIAL_LIGHTING.md.
+Implemented:
+- **Primary receiver depth coverage (F1).** `PrimaryRayGen` spans N64 GL-style NDC z −1..1. The old D3D-style 0..0.99 window dropped receivers nearer than about 20 units and farther than about 1.3k–1.7k units.
+- **Per-backend receiver clip W (F2).** RasterPS uses `1/SV_Position.w` only under `__spirv__` and `SV_Position.w` on DXIL. The SPIR-V path is byte-identical in behaviour.
+- **FullSync metadata.** A later FullSync inside the same task now carries `fogMode`/`perPixelLighting`/`atmosphere` into the next Workload (`rt64_state.cpp`); the next task still overwrites them.
+- **Environment directional visibility authority (ADR-014).**
+  - The adapter publishes `environmentDirection[i].w` = `smoothstep(0, 0.1, normalized y)`, from MM's `ActorShadow_DrawFeet` `dir.y > 0` rule (`src/main/rt64_render_context.cpp`).
+  - In RT64, authority scales owned-term shadowing (`lerp(1, traced, a)`), ADR-012 gain (`a·DirectAuthority`), ADR-013 additions (`traced·a`; no visibility means no addition) and GI primary transport. Authority 0 traces no primary rays.
+  - Expansion (bit 64) now requests its own visibility rays, so additions stay occluded with raster sun shadows off.
+  - `FramebufferParams.shadowSun` became `primaryVisibility` (traced, authority, reserved, owned-application); all layout sizes are unchanged.
+- **Room occluder completion (ADR-015).** The MM `Room_Draw` patch additionally submits opaque cullable-room entries whose bounding sphere is entirely behind the camera (the exact complement of MM's test). They produce zero raster pixels; XLU order and the beyond-zFar cull are unchanged. Host import `recomp_room_occluder_completion_enabled` (0x8F0000EC); `ZELDA64RECOMP_ROOM_OCCLUDERS=0` gives A/B.
+- **Scene series (developer).** `RT64_RT_SCENE_SERIES=<file>` writes per-occurrence JSONL of CPU collection facts, stock transform-group identity triangles and production raygen counters. They are written only when `environment[5].x` is set (formerly a dead duplicate); there is no policy input.
+- **API logging.** Startup stderr logs the requested and chosen graphics API.
 
-Expansion defaults on within Enhanced, bounded by source/receiver permission; session RT64_PRIMARY_EXPANSION=0 or F1 Primary spatial responsibility restores ADR-012 alone. rt_primary_direct off / Direct authority0 also disables it. Views30/31 expose role/applied increment. Existing local/GI/fill/shadow controls remain independent.
+## Build
 
-F9 adds a session RT+ master atomic; RT64_RT_PLUS_MASTER=0 starts OFF. Effective DrawParams plus existing Enhanced VS/PS gates restore authored per-vertex lighting, original fog/cutout and disable directional visibility, local/spatial direct, AO/enclosure, GI/ambient transfer and diagnostics. Requested config/overrides are never rewritten. ON restores their exact values. Ordinary raster MSAA sample allocation, resolution/presentation and mod/texture replacements remain baseline settings: MSAA changes require application-wide shader/cache/target rebuilding, not a safe per-frame flag. F1/stdout confirmation exists. Physical key delivery remains unqualified (below).
+Final full build (patches ELF, N64Recomp patches, all RT/raster SPIR-V/DXIL consumers, executable) passed. Executable SHA256 `4774970C324DD3C9F6249009F1D8276C979294E314831FD491DCAA3344E68128` at `_working-directory/build-zelda-validation/Zelda64Recompiled.exe`. Build script: `_working-directory/diagnostics/2026-09-24-scene/build.ps1`.
 
-## Build and checkpoints
+## Runtime evidence (Vulkan RX 9070 XT, `_working-directory/diagnostics/2026-09-24-scene/`)
 
-Full integration build and final CPU link passed. Actual raster DXIL/SPIR-V dynamic/library/specialization/flat/MSAA and PrimaryHitRT consumers regenerated; existing CPU assertions and fresh DXIL reflection confirm 128-byte FramebufferParams and offsets80/96/112. Final executable SHA256: 177110D253382F75BADCEE606601E2C71A0E67BE1AA98A427EAEABC7695EC113.
+**Camera motion**, deterministic `motion-arc.json` in noon Town, 20 Hz and HFR:
+- No whole-frame RT disable. World-camera agreement never rejected a range. HFR occurrences of one game frame carry identical scenes.
+- The old window lost 8–30% of primary hits near the camera in motion and up to 43% of the frame against walls (`motion13-old-vs-new.png`, view 13). The far loss was 1.4% of hits in Termina Field.
+- Remaining triangle churn is game culling, dominated by tagged actors. Room geometry is stable. Room occluder A/B added up to 427 triangles and about 860 blocked pixels per frame.
 
-Evidence root: _working-directory/diagnostics/2026-09-22-responsibility/. build-integration.log preserves shader compilation; build.log is final; raster-abi.txt is reflection. run.ps1 clones mutable profiles and uses existing playback/warp/held-workload capture. Architecture checkpoint and prior handoff are saved there. Changed code: parent adapter; RT64 queue/DrawParams, framebuffer renderer, shared parameter comments, primary helper, per-pixel/raster shader, F1/F9 and capture labels/fixture. No N64ModernRuntime change.
+**Night 23:00:**
+- The primary points down (y −0.98) with RGB (0.39, 0.51, 0.24). The old build traced these rays into the ground; visibility gating alone over-brightened undersides via the 1.77× gain.
+- The final build traces 0 rays and matches the authored magnitude (`night-link-4way.png`).
+- The arch shading on the wall is authored (present with master off).
 
-## Checkpoint 3 — focused qualification
+**Noon:** authority 1, all hits traced. With raster shadows off, visibility is still traced for expansion.
 
-- noon-compact-34a9bdd9-a702-4ad8-a121-c404171b3a00: all16 states captured. 3954 owned crop pixels; expansion on/off gives identical raster, GI, local, spatial and visibility buffers. Positive owned term matches gain1.69089 within3.1e-5 UNORM error. Authority0/.5/1 raster means .218635/.230973/.243107. No broader receivers in this crop.
-- inn-e13777cc-e5e8-4eb5-9667-e8743f9f802d: all16 captured. 3393 broader pixels, 702 owned. 3148 blocked broader pixels have exactly zero increment. Visibility off exposes nonzero bounded response. Owned and unrelated lighting buffers unchanged. Expansion disable and master OFF->ON restoration are byte-identical after the queue snapshot correction.
-- inn-clear-924b58f4-e822-4ab4-8c2a-aa90b3e83a53: same known Inn entrance0xBC00 with existing visibility-off control, all16 captured. 3456 broader pixels; 33 change final raster, max RGB delta .021561; max shader increment .074403. 640 owned pixels unchanged by expansion. Authority means .122949/.124204/.125298. Disabling expansion returns exact previous raster; Direct0 equals interpretation off; master OFF->ON restores exact configured raster. Raw GI/local/spatial/visibility unchanged by expansion. Contact sheets visually inspected; this is narrow composition evidence, not broad scene/seam certification.
-- Clean16-sample Inn benchmark: whole workload median .68406ms, fused RT .17510ms, no incomplete samples or resource growth; no readbacks. No new traversal topology/resources. performance.json records this sanity check, not a speedup claim.
+**Benchmark** (clean 16-sample Town noon, old/new): whole 0.851/0.863 ms, AS build 0.397/0.398 ms, fused RT 0.161/0.150 ms, no resource growth (`performance.json`). Neutral.
 
-Final CPU-only correction denies RT mesh submission/initialization when no effective consumer exists (e.g. all spatial features off and Direct authority0). Previously qualified active configurations are unchanged. Final-binary master-OFF benchmark completed all16 samples with zero RT build/tracing/reconstruction intervals, no incomplete samples and no resource growth (master-off-final-* under evidence root).
+## Limits / open
 
-## Limits / next qualification
+- **D3D12 runtime is unqualified.** RT64 forces Vulkan on RDNA4 drivers ≤ Aug 2026 even when D3D12 is requested; the DXIL clip-W convention is verified only at DXC level. The earlier view-13 "D3D12" captures were actually Vulkan.
+- Off-screen culled actors do not cast (actor draw culling is gameplay-coupled; no persistence, per ADR-015).
+- The secondary directional is published with authority but has no RT visibility realization.
+- A full BLAS/TLAS rebuild still happens every framebuffer × occurrence (AS build is about 46% of the workload; about 7× per game frame at HFR).
+- Temporal identity, motion, reconstruction seam and the semantic packet transport (reassessment F3/F5/F8/F9/F10) are unchanged.
+- No broad scene/mod/MSAA qualification. Physical F9 delivery remains unqualified as before.
 
-Implementation/build and focused lighting/override-state validation are complete. Missing/invalid semantics, ambiguous duplicate matching, no-guide fallback, isolated mode64-only operation, Native, MSAA/cutout and fog visual endpoints are structurally verified, not individually runtime-fixtured here. F9 is wired before inspector input consumption with repeat suppression; injected F9, existing F1 and Escape all failed to reach the game through the available computer-use route. Do not claim physical hotkey/UI notification delivery was qualified. Next narrow manual check: press F9 twice in ordinary gameplay, confirm OFF/ON and restoration with mixed enabled/disabled features. The capture fixture now releases its controls after16 occurrences.
+## Next
 
-Initial192x160 burst dropped writer-busy states; superseded by complete64x64 runs. No broad renderer/mod/platform certification. Camera-motion/caster-submission/cadence/reconstruction limitations remain outside scope. RT+ broader coverage is bounded and enabled, not a claim of universally coherent outdoor lighting.
+The scene lifetime package:
+- a per-Workload static/dynamic partition keyed by stock transform groups;
+- reuse or refit across HFR occurrences (Plume has no AS update API yet; a static/dynamic BLAS split needs none);
+- a separate RT+ requirement flag instead of the repurposed stock `raytracingEnabled`.
 
-Changes are committed as one checkpoint: parent 8893d4a -> RT64 ccb86d2 -> Plume 91e6711. Architecture reassessment 2026-09-24 (docs/reviews/RT_PLUS_ARCHITECTURE_REASSESSMENT_2026-09-24.md) found two unfixed coverage defects to address first: primary RT rays span GL-style NDC z 0..0.99 only (receivers ~20..1.3–1.7k units), and RasterPS clip-W reconstruction is likely wrong on D3D12. It also recommends work packages WP1–WP5; no code changed. Preserve supplied untracked docs/input-research, docs/reviews, source map and lib/rt64.7z. Generated CHANGELOG.md stays with its release workflow; relevant release-note summary is in CHANGELOG-INTERNAL.md.
+Then source collection with stable IDs (F3), reusing ADR-014's per-source authority pattern.
+
+Preserve the supplied untracked `docs/AGENTS_RT64.md`, `docs/MM_LIGHTING_INSTRUMENTATION_SOURCE_MAP.md`, `docs/input-research/`, the untracked older reviews and `lib/rt64.7z`. Generated `CHANGELOG.md` stays with its release workflow.

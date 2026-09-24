@@ -178,3 +178,14 @@ and consume them in `patches/debug_patches.c`. They are potential future aids if
 checkpoint setup becomes the bottleneck. Controller playback is implemented at
 `recomp::get_n64_input`; pushing SDL keyboard events alone does not update the
 keyboard-state array used by gameplay input.
+
+## RT scene series and camera-motion reproduction (2026-09-24)
+
+`_working-directory/diagnostics/2026-09-24-scene/` contains the current loop:
+- `run.ps1` is the responsibility harness plus `-Motion <playback.json>`, `-Series`, `-Api`, `-Exe`, `-NoShadows` and `-NoRoomOccluders`.
+- `ab.ps1` runs one visible candidate and takes window captures (`shots.ps1`).
+- `series.py`, `identities.py` and `compare.py` analyze `series.jsonl`.
+
+Developer input playback is deterministic enough for frame-matched A/B: camera positions matched on all 1,390 common frames.
+
+Verify the actual backend in stderr (`[RT64] Graphics API requested=… chosen=…`). On RDNA4 drivers up to Aug 2026, RT64 forces Vulkan even when D3D12 is requested.

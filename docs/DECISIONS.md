@@ -60,6 +60,8 @@
 
 **Consequences:** Future raster enhancements should prefer values already available from system semantics or existing interpolants. Any new cross-stage varying requires in-game validation on both Vulkan and D3D12, including AMD hardware, before acceptance.
 
+**Amendment 2026-09-24:** Pixel-shader `SV_Position.w` is backend-specific. It is 1/w in Vulkan SPIR-V (FragCoord) and clip w in D3D DXIL; DXC `-fvk-use-dx-position-w` exists for exactly this. Reconstruct clip W per target (`#ifdef __spirv__`). The RT receiver gate did so from 2026-09-24. The fog path reads only `SV_Position.z`.
+
 ## ADR-005 — Atmospheric art direction is a masked per-frame mod event
 
 **Status:** Accepted for the experimental Atmospheric mode
@@ -164,3 +166,42 @@ The generic primary color record's previously unused W grants unowned response; 
 Semantic Locals already meet this distinction through response.w, receiver traits, exact owned replacement and bound-source exclusion; retain their equations and controls. Secondary has resolved source data for existing GI but no published unowned raster permission or incremental energy contract; do not invent one by copying Primary's gain. Ambient remains a confidence-weighted exact/artistic fill transfer, independent of directional visibility and slot matching. These responsibilities share the principle and fallback discipline, not identical shader math.
 
 Session Primary-expansion control restores ADR-012 alone. Primary interpretation off/Direct authority zero disables the added responsibility completely. F9 applies one effective master override above configured RT+ features; it never rewrites configuration or developer overrides. Ordinary raster MSAA, resolution, presentation and mod/texture replacements retain their configured baseline behavior. MSAA sample changes require application-wide shader-cache/target reconstruction and are not a per-frame RT+ responsibility; enhanced cutout coverage does return to its original path.
+
+## ADR-014 — Environment directionals carry geometric visibility authority
+
+Status: accepted after focused Vulkan qualification, 2026-09-24. Refines ADR-012/013; does not change their equations for geometric sources.
+
+A valid direction does not establish that a directional is a geometric light. The adapter publishes, per environment directional, a visibility authority in [0,1] (`AtmosphereParameters::environmentDirection[i].w`; zero denies). RT64 treats it generically. It is the source's geometric role, and it scales every modern responsibility that depends on that role:
+
+- owned-term shadowing uses `lerp(1, traced, authority)`; authority 0 traces no primary rays;
+- ADR-012 energy reinterpretation uses `directAuthority * authority`, so a non-geometric fill keeps its authored magnitude;
+- ADR-013 unowned additions require traced geometric visibility: `increment * traced * authority`. Missing visibility means no addition, never an unoccluded one. Expansion requests primary rays itself (spatial bit 64) even when raster sun shadows are off;
+- GI bounce transport from the primary is weighted by authority.
+
+MM derives authority from its own directional-shadow rule. `ActorShadow_DrawFeet` lets a directional cast only while `dir.y > 0`, weighted by RGB·|y|. The adapter uses `smoothstep(0, 0.1, normalized y)`; RGB weighting stays in the existing energy terms. In time mode `dirLight1` points below the horizon at night: it is authored fill, not a shadow caster.
+
+Rejected alternatives:
+- an elevation branch in RT64: that is game policy;
+- tracing and then gating by energy: that spends rays to remove authored fill;
+- keeping amplification for non-geometric fills: once no longer masked by false occlusion it over-brightened night undersides.
+
+The secondary also receives published authority. RT64 does not yet realize secondary visibility; that is an open responsibility, not an implied permission.
+
+`FramebufferParams` offset 32 is now `primaryVisibility` (x traced, y authority, w owned-term application). Its former `shadowSun.xyz` had no GPU reader. Layout sizes are unchanged. See PRIMARY_ENVIRONMENT_DIRECT.md.
+
+## ADR-015 — RT scene membership stays submission-defined; completeness belongs to the submitter
+
+Status: accepted, 2026-09-24. Refines ADR-008/011 scene boundary.
+
+Camera-motion evidence showed what actually changes (RAYTRACING_FOUNDATION.md, 2026-09-24 section):
+- The largest loss was renderer-side: primary guides spanned D3D-style NDC 0..0.99 on GL-style N64 clip space. Receivers closer than about 2·zNear lost RT (up to 43% of frames near walls). Receivers beyond the far window were lost too (1.4% of Termina Field hits).
+- Remaining population churn is game culling. Actor draw culling (tagged transform groups entering/leaving) dominates. Behind-camera cullable-room entries are a small share.
+- World-camera agreement never failed, and HFR occurrences carry identical scenes.
+
+Decisions:
+- Primary rays span the full rasterized depth range (NDC −1..1).
+- RT64 does not persist or synthesize geometry the game did not submit this Workload.
+- Where culling is a historical performance realization with no game-visible effect, the adapter may submit the culled opaque geometry. MM does this for cullable-room entries entirely behind the camera: zero raster pixels, same order, beyond-zFar and XLU unchanged.
+- Actor draw culling is coupled to actor draw side effects and is not bypassed.
+- Stock transform-group IDs are the stable identity that any future persistence or temporal policy must key on. Untagged draws use frame-pool matrices and have no cross-frame identity.
+- Scene lifetime work (reuse per Workload, refit per HFR occurrence) is performance and temporal groundwork, not a shadow-completeness fix.

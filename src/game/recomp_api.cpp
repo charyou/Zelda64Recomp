@@ -1,4 +1,6 @@
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 
 #include "recomp.h"
 #include "librecomp/overlays.hpp"
@@ -363,6 +365,16 @@ extern "C" void recomp_set_environment_fog(uint8_t* rdram, recomp_context* ctx) 
         .secondary_rgb = MEM_W(38 * sizeof(u32), fog),
         .local_bounce_strength = read_float(39),
     });
+}
+
+extern "C" void recomp_room_occluder_completion_enabled(uint8_t* rdram, recomp_context* ctx) {
+    // Default on: the extra entries rasterize no pixels. ZELDA64RECOMP_ROOM_OCCLUDERS=0 restores
+    // original submission for A/B qualification.
+    static const bool enabled = []() {
+        const char* value = std::getenv("ZELDA64RECOMP_ROOM_OCCLUDERS");
+        return (value == nullptr) || (std::strcmp(value, "0") != 0);
+    }();
+    _return<u32>(ctx, enabled ? 1U : 0U);
 }
 
 extern "C" void recomp_lighting_capture_is_armed(uint8_t* rdram, recomp_context* ctx) {

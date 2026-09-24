@@ -223,5 +223,7 @@ DECLARE_FUNC(u32, recomp_lighting_capture_begin, RecompLightingGameSnapshot* sna
 DECLARE_FUNC(void, recomp_lighting_capture_post, u32 token, RecompLightingGameSnapshot* snapshot);
 DECLARE_FUNC(void, recomp_lighting_capture_finalize, RecompLightingBindingFrame* bindings);
 DECLARE_FUNC(u32, recomp_lighting_capture_is_armed);
+// Nonzero when behind-camera opaque room entries are submitted as renderer occluders.
+DECLARE_FUNC(u32, recomp_room_occluder_completion_enabled);
 
 #endif

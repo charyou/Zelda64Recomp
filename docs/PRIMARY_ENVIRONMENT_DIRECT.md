@@ -2,6 +2,26 @@
 
 Implemented 2026-09-22; see ADR-012 and ADR-013. This is a stylized Enhanced responsibility, not a physical lighting model.
 
+## 2026-09-24 — Geometric visibility authority (ADR-014)
+
+The adapter publishes `environmentDirection[0].w` (and `[1].w`) as visibility authority `a` in [0,1]. MM uses `smoothstep(0, 0.1, normalized dir.y)`, following `ActorShadow_DrawFeet`'s `dir.y > 0` rule. `a` scales every modern responsibility that depends on the primary's geometric role:
+
+```
+effectiveDirectAuthority = a * DirectAuthority          // ADR-012 gain; a = 0 keeps authored magnitude
+ownedTerm = authoredTerm * gain * lerp(1, traced, a)    // only when raster sun shadows are enabled
+increment = ADR-013 increment * traced * a              // no visibility traced => no addition
+GI primary incident *= a                                // bounce transport from geometric sources only
+```
+
+No primary visibility ray is traced when `a = 0`. Spatial mode bit 64 (unowned permission) now requests the primary visibility ray itself, so bounded additions stay occluded with raster sun shadows off (the default). `FramebufferParams.primaryVisibility` (offset 32, formerly `shadowSun`) is (traced, authority, reserved, owned-term application). TraceParams `sunDirection.w` carries authority.
+
+Evidence (`_working-directory/diagnostics/2026-09-24-scene/`):
+- Noon Town: `a = 1`, all 78,187 primary hits traced, same shadow behaviour as before.
+- 23:00: published primary direction y = −0.98 with RGB (0.39, 0.51, 0.24). The previous build traced these rays into the ground and darkened downward-facing surfaces. With visibility gating alone the fill was amplified about 1.77×, visibly over-bright. The final build traces 0 rays, and Link's night shading matches the authored/master-off magnitude (`night-link-4way.png`).
+- Raster shadows off at noon: the rays are still traced for expansion (29,781 of 78,187 hits blocked).
+- The secondary is published but RT64 does not realize secondary visibility yet.
+
+
 ## Ownership and interpretation
 
 The adapter publishes resolved primary direction and RGB through the existing environment snapshot. It owns game interpretation. RT64 knows only a generic primary directional source. No new game packet, celestial classification, clock, scene/actor ID, elevation policy or visual-sun dependency was added.

@@ -384,6 +384,9 @@ zelda64::renderer::RT64Context::RT64Context(uint8_t* rdram, ultramodern::rendere
     setup_result = map_setup_result(app->setup(thread_id));
     // Get the API that RT64 chose.
     chosen_api = map_graphics_api(app->chosenGraphicsAPI);
+    fprintf(stderr, "[RT64] Graphics API requested=%s chosen=%s\n",
+        ultramodern::renderer::get_graphics_api_name(cur_config.api_option).c_str(),
+        ultramodern::renderer::get_graphics_api_name(chosen_api).c_str());
     if (setup_result != ultramodern::renderer::SetupResult::Success) {
         app = nullptr;
         return;
@@ -483,8 +486,20 @@ void zelda64::renderer::RT64Context::send_dl(const OSTask* task) {
         ((environment.ambient_rgb >> 8) & 255) / 255.0f,
         (environment.ambient_rgb & 255) / 255.0f,
         std::clamp(environment.sky_fill_weight, 0.0f, 1.0f) };
-    atmosphere.environmentDirection[0] = { environment.primary_direction[0], environment.primary_direction[1], environment.primary_direction[2], 1.0f };
-    atmosphere.environmentDirection[1] = { environment.secondary_direction[0], environment.secondary_direction[1], environment.secondary_direction[2], 0.0f };
+    // Geometric visibility authority mirrors MM's own directional shadow rule: ActorShadow_DrawFeet
+    // lets a directional (local or environment) cast only while it arrives from above (dir.y > 0).
+    // A below-horizon environment directional (dirLight1 at night in time mode) is authored fill,
+    // not a geometric occluder source. The short ramp avoids a pop at the horizon crossing.
+    auto visibilityAuthority = [](const float* direction) {
+        const float length = std::sqrt(direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2]);
+        if (!std::isfinite(length) || (length < 1e-4f)) return 0.0f;
+        const float t = std::clamp((direction[1] / length) / 0.1f, 0.0f, 1.0f);
+        return t * t * (3.0f - 2.0f * t);
+    };
+    atmosphere.environmentDirection[0] = { environment.primary_direction[0], environment.primary_direction[1], environment.primary_direction[2],
+        visibilityAuthority(environment.primary_direction) };
+    atmosphere.environmentDirection[1] = { environment.secondary_direction[0], environment.secondary_direction[1], environment.secondary_direction[2],
+        visibilityAuthority(environment.secondary_direction) };
     auto resolvedColor = [](uint32_t rgb) { return hlslpp::float4(float((rgb >> 16) & 255)/255, float((rgb >> 8) & 255)/255, float(rgb & 255)/255, 0); };
     atmosphere.environmentColor[0] = resolvedColor(environment.primary_rgb);
     // Profile permission for bounded additional Primary response on validated spatial receivers.

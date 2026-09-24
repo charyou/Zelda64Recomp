@@ -1,5 +1,20 @@
 # Internal Changelog
 
+## 2026-09-24 — RT receiver coverage, camera-motion classification, primary visibility authority
+
+- Implemented from the architecture reassessment:
+  - primary rays now span GL-style NDC −1..1 (the old 0..0.99 window dropped near/far receivers);
+  - per-backend receiver clip W (`__spirv__`);
+  - task metadata carried across a mid-task FullSync.
+- Added a developer RT scene series (CPU collection facts, stock transform-group identity triangles, raygen counters). Deterministic Town motion at 20 Hz and HFR shows:
+  - no whole-frame disables, world-camera rejections or HFR divergence;
+  - the old window lost 8–30% of hits near the camera and up to 43% of the frame against walls, plus 1.4% far hits in Termina Field;
+  - remaining churn is actor draw culling.
+- ADR-015: RT scene membership stays submission-defined. The MM adapter now submits behind-camera opaque cullable-room entries (zero raster pixels; up to 427 triangles and about 860 extra blocked pixels per frame). No persistence; actor culling untouched.
+- ADR-014: the adapter publishes environment-directional visibility authority from MM's `dir.y > 0` shadow rule. It scales owned shadowing, ADR-012 gain, ADR-013 additions (no visibility means no addition) and GI transport. At 23:00 the below-horizon primary is no longer traced; night shading matches the authored magnitude.
+- Full build passed (SHA `4774970C…68128`). Old/new benchmark is neutral (0.851/0.863 ms). D3D12 runtime is unqualified: RT64 forces Vulkan on this RDNA4 driver, and startup now logs requested/chosen API.
+- Release-note summary: Enhanced RT lighting no longer drops out near the camera or at long distance, and night lighting no longer casts shadows from below-horizon light.
+
 ## 2026-09-24 — RT+ architecture reassessment (review only)
 
 - Reviewed committed parent 8893d4a / RT64 ccb86d2 / Plume 91e6711 against stock RT64 5473732 (upstream main only 2 commits ahead). Responsibility/ownership-vs-permission model, per-responsibility fallback, receiver rejection and shared scene judged durable. Main risk is underneath: per-replay RT scene without identity (stock matching/velocity unused), source availability defined by RSP binding, and missing visibility authority for environment directionals (night primary points below horizon yet is shadow-traced; secondary never is).

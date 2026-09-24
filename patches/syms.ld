@@ -58,3 +58,4 @@ recomp_lighting_capture_begin = 0x8F0000DC;
 recomp_lighting_capture_post = 0x8F0000E0;
 recomp_lighting_capture_finalize = 0x8F0000E4;
 recomp_lighting_capture_is_armed = 0x8F0000E8;
+recomp_room_occluder_completion_enabled = 0x8F0000EC;

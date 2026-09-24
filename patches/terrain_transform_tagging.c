@@ -1,4 +1,5 @@
 #include "patches.h"
+#include "graphics.h"
 #include "transform_ids.h"
 #include "overlays/actors/ovl_Dm_Opstage/z_dm_opstage.h"
 #include "overlays/actors/ovl_Dm_Char01/z_dm_char01.h"
@@ -25,8 +26,32 @@ RECOMP_PATCH void Room_Draw(PlayState* play, Room* room, u32 flags) {
         CLOSE_DISPS(play->state.gfxCtx);
 
         sRoomDrawHandlers[room->roomShape->base.type](play, room, flags);
-        
+
         OPEN_DISPS(play->state.gfxCtx);
+
+        // @recomp Cullable rooms skip opaque entries whose bounding sphere lies entirely behind the camera.
+        // That was an N64 performance realization: those entries produce no raster pixels, but they
+        // still occlude light arriving from behind the view. Submitting them keeps the renderer's
+        // opaque scene complete. Raster output is unchanged; beyond-zFar culling and XLU order remain.
+        if ((flags & ROOM_DRAW_OPA) && (room->roomShape->base.type == ROOM_SHAPE_TYPE_CULLABLE) &&
+            (play->roomCtx.unk78 >= 0) && recomp_room_occluder_completion_enabled()) {
+            RoomShapeCullable* roomShape = &room->roomShape->cullable;
+            RoomShapeCullableEntry* entry = Lib_SegmentedToVirtual(roomShape->entries);
+            f32 inverseDepthScale = 1.0f / play->projectionMtxFDiagonal.z;
+            s32 i;
+            for (i = 0; i < roomShape->numEntries; i++, entry++) {
+                Vec3f pos;
+                Vec3f projectedPos;
+                pos.x = entry->boundsSphereCenter.x;
+                pos.y = entry->boundsSphereCenter.y;
+                pos.z = entry->boundsSphereCenter.z;
+                SkinMatrix_Vec3fMtxFMultXYZ(&play->viewProjectionMtxF, &pos, &projectedPos);
+                // Exactly the complement of Room_DrawCullable's behind-camera test.
+                if ((entry->opa != NULL) && !(-ABS_ALT(entry->boundsSphereRadius) < projectedPos.z * inverseDepthScale)) {
+                    gSPDisplayList(POLY_OPA_DISP++, entry->opa);
+                }
+            }
+        }
 
         // @recomp Pop the room's matrix tags if applicable.
         if (flags & ROOM_DRAW_OPA) {

@@ -1,5 +1,7 @@
 # Spatial response, bounded GI and lighting authority
 
+2026-09-24: GI primary bounce illumination and its visibility ray are weighted by the adapter-published primary visibility authority (ADR-014). A non-geometric primary, such as the below-horizon night fill, contributes no bounce transport.
+
 Implemented 2026-09-14. Build/runtime continuation evidence: HANDOFF.md. Source facts: ASTRA_LIGHTING_ADDENDUM.md. RT64 contains generic source/receiver policy only.
 
 ## Receiver and ownership boundary

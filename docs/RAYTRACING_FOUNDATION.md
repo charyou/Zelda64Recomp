@@ -1,5 +1,34 @@
 # Hardware RT foundation and directional hard shadows
 
+## 2026-09-24 — Receiver coverage, scene population evidence (ADR-014/015)
+
+**Primary ray extent.** `PrimaryRayGen` now unprojects NDC z −1 (near plane) and +1 (far plane). N64 `guPerspective` clip space is GL-style, so the previous D3D-style window [0, 0.99] started at about 2·zNear and ended well before zFar (MM zNear 10: from about 20 units to 1.3k–1.7k units). Receivers outside that band silently lost every RT responsibility. Clip-W guide reconstruction and TMax follow the new endpoints. Primary rays per pixel and cost are unchanged.
+
+**Receiver clip-W per backend.** The RasterPS receiver gate reconstructs clip W as `1/SV_Position.w` only under `__spirv__`, and as `SV_Position.w` on DXIL. The SPIR-V code is unchanged. D3D12 runtime is still unqualified here: RT64 forces Vulkan on this RX 9070 XT driver, and the startup log now prints requested versus chosen API.
+
+**Surface record** (corrects the Run-2 text below): `surfaces[GeometryIndex]` is (RDP call index, index start, face count, receiver traits). The projection is per framebuffer (`projectionIndex`).
+
+**Scene series (developer).** `RT64_RT_SCENE_SERIES=<path>` writes one JSONL row per traced framebuffer per render occurrence, after the existing workload wait (`RT64_RT_SCENE_SERIES_LIMIT`, default 20000 rows). Each row records:
+- CPU collection facts: candidate/opaque ranges, world-camera accept/reject and worst values, projection mismatches, triangles, receivers, sources;
+- submitted triangles by stock transform-group ID;
+- camera, primary direction/RGB/visibility authority, and modes;
+- GPU counters from the production raygen (primary hit/miss, primary visibility traced/blocked, receiver hits/blocked, hits the old window would have lost near/far).
+
+Counters are written only when `environment[5].x` is set; `environment[5]` was a dead duplicate of the primary direction. Off costs one always-bound 64-byte UAV. The series never feeds policy.
+
+**Evidence** (Vulkan RX 9070 XT, `_working-directory/diagnostics/2026-09-24-scene/`, deterministic playback `motion-arc.json`):
+- Old window, near side: in camera-close views (camera against a wall), up to 43% of the frame showed rejected receivers in view 13 with the previous build; the new build is almost entirely accepted (`motion13-old-vs-new.png`). In ordinary Town motion, 8–30% of primary hits were closer than the old origin.
+- Old window, far side: 1.4% of Termina Field hits lay beyond it (zFar 12850).
+- No whole-frame disables in about 1,400 20 Hz frames or about 5,400 HFR occurrences. World-camera agreement never rejected a range.
+- HFR (about 7 occurrences per game frame): identical triangle sets within a game frame; median within-frame blocked-fraction spread 0.0006.
+- Population churn (2.6k–5.3k triangles) is game culling. Room geometry is stable (885–1,156 triangles). Changes are dominated by tagged actors (skeletal NPC/prop limb groups) entering or leaving with view direction. Untagged draws use alternating frame-pool matrices and have no stable identity.
+- MM cullable-room entries entirely behind the camera now reach the RT scene through the adapter (`patches/terrain_transform_tagging.c`; A/B with `ZELDA64RECOMP_ROOM_OCCLUDERS=0`). Deterministic A/B: up to 427 extra triangles and up to about 860 extra blocked pixels per 400×240 frame, versus ±100 animation noise. Raster output is unchanged by construction.
+
+Remaining limits: off-screen culled actors do not cast, and there is no persistence (ADR-015). A full BLAS/TLAS rebuild still happens every occurrence. Clean 16-sample Town benchmark: AS build 0.40 ms of a 0.86 ms workload, repeated about 7× per game frame at HFR.
+
+---
+
+
 **2026-09-14 current extension:** [SPATIAL_LIGHTING.md](SPATIAL_LIGHTING.md) documents the same scene's receiver boundary, one-bounce global/local GI, separate raw/guides/reconstruction and RT+ composition. Lighting now uses explicitly published resolved primary direction AND RGB; secondary directional is separate. Visual sunPos remains atmosphere presentation metadata. The Run-2 direction description below is historical and superseded for lighting by this contract. FramebufferParams112, TraceParams128, RSPLight96, RDPParams336.
 
 
