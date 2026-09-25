@@ -1,5 +1,26 @@
 # Internal Changelog
 
+## 2026-09-25 — Temporal GI reconstruction with geometric history validity (ADR-017)
+
+- **Decision (ADR-017, ADR-016 amendment):** WP3 identity, continuity and motion are candidate lineage and motion admissibility only. History validity belongs to the consumer: geometric agreement of stored previous depth and normal with the reprojected surface, occurrence continuity and current validity. Identity never authorizes history. Old WP2 source collection is not a prerequisite; its resumption triggers are recorded. WP3 code is unchanged, and the identity fixture output is byte-identical.
+- **Implemented:**
+  - canonical 2.5D motion guide: stored-occurrence camera, and stock motion aligned exactly within a Workload and by at most half a frame across it;
+  - GPU per-surface motion admissibility;
+  - `IndirectReconstruction` backend: unchanged spatial filter plus a temporal stage with per-tap depth/normal validation, orientation ageing, raw-window clamp and a 6-game-frame bound;
+  - per-occurrence GI seed only while history is active;
+  - session toggle (default on within GI) and `RT64_RT_GI_TEMPORAL`;
+  - developer tuning override, new snapshots and a scene-series `temporal` object.
+- **Evidence (Vulkan, Clock Town):**
+  - GPU motion vs CPU re-derivation: 0.013 px median.
+  - Fast-turn reprojected instability 0.0046 → 0.0016; noise 0.0045 → 0.0027.
+  - Still-shot noise 0.0056 → 0.0023, energy within about 1%.
+  - At 144 Hz, 1,166/1,171 occurrences continuous with aligned motion.
+  - Product cost about +0.04 ms reconstruction and +32 B/pixel (+49 MB at 1600×960); trace unchanged.
+- **Corrections found at runtime:** the spatial-result clamp darkened converged history by 3.5% (replaced by a raw-window clamp). A rotating Link showed stale irradiance (fixed by orientation ageing). An occurrence-count bound over-lagged at 20 Hz (replaced by a game-frame bound). Capture-induced HFR frame skipping was correctly refused by the alignment guard.
+- **Open:** a moving actor's indirect-shadow lag (8–20% near a turning Link at 20 Hz) is only bounded. D3D12, FSR Ray Regeneration and HFR image metrics are unqualified.
+- Final executable `4B25C202…6E129`; runs in `_working-directory/diagnostics/2026-09-25-temporal/`. No commits.
+- Release-note summary: Enhanced RT+ indirect lighting now accumulates over time with motion-aware reprojection, markedly reducing GI noise and shimmer during camera movement at negligible cost.
+
 ## 2026-09-25 — Pre-next-work-package identity and local-source validation
 
 - A deterministic CPU fixture using production `RaytracingSceneRecord::describe/finalize` reproduced false Tagged correspondence after reorder and insertion/removal of equal-input surfaces. Explicit vertex velocity can make the wrong ordinal correspondence `Continuous` and `Interpolated`. ADR-016 provenance needs a separate correspondence/history-validity guard before temporal consumption; no renderer policy was changed.

@@ -254,6 +254,85 @@ Rejected, with evidence:
 - Using the color address in continuity.
 
 Consequences:
-- Future temporal consumers key history on Tagged/Content identity with explicit continuity, and use stock motion only for trusted motion classes.
+- ~~Future temporal consumers key history on Tagged/Content identity with explicit continuity, and use stock motion only for trusted motion classes.~~ Superseded by the amendment below and ADR-017.
 - A future derived caster or proxy, or an explicitly authorized finite emitter, can reference a surface's identity and topology/shape keys without replacing this lifetime.
 - Refit trace quality is bounded to one game frame of interpolation. Measured trace cost is unchanged.
+
+**Amendment 2026-09-25 (identity is candidate lineage, not correspondence):** `rt64_wp3_identity_fixture` runs the production `describe`/`finalize` on equal-input Tagged surfaces. A,B → B,A, insertion and removal keep an ordinal's key and report `Continuous` for the wrong logical surface. With explicit vertex velocity, that wrong lineage is also `Interpolated` ([validation](reviews/RT_PLUS_PRE_NEXT_WP_VALIDATION_2026-09-25.md)). The lifetime/refit/reuse decisions are unaffected, because they key on exact content and index data, not on identity.
+
+The provenance contract is therefore narrowed. The implementation is unchanged, and the fixture stays as regression evidence of the limit.
+- Identity and continuity are **candidate lineage**: statistics, and a possible input to future keyed caches. They never establish that a history sample belongs to the same logical surface.
+- `Static` / `Interpolated` mean only that the stock per-vertex motion (`worldVelBuffer`) is **admissible** for the surface: exact unchanged content, or matched transforms without unvelocitized deformation relative to the candidate lineage. `Unknown` means it is not admissible.
+- Admissible motion is still only a hypothesis about where to look in the previous occurrence. The motion vector itself comes from the stock transform association and the vertex's own velocity, not from the ordinal lineage. The fixture's false lineage therefore does not falsify the vector. It does disqualify any consumer that skips independent validation.
+- Every history consumer must establish correspondence itself (ADR-017). Do not "fix" the fixture by extending the identity key toward a persistent object-identity system.
+
+## ADR-017 — Temporal history validity belongs to the consumer: geometric correspondence in the stored previous occurrence
+
+Status: accepted, 2026-09-25. Implemented and Vulkan-qualified for Clock Town at Original refresh (images) and 144 Hz (occurrence series). Details: [INDIRECT_RECONSTRUCTION.md](INDIRECT_RECONSTRUCTION.md). Extends ADR-011 reconstruction; relies on the ADR-016 amendment.
+
+First consumer: bounded diffuse GI. Its raw signal is incident indirect irradiance at the primary receiver: the sum over bounce hits of incident light times the bounded tint of the *hit* surface. Receiver response is applied only in composition. The signal is therefore a function of world position, orientation and scene state, not of which logical surface is the receiver. It is demodulated by construction.
+
+Correspondence evidence. A history sample may contribute to a pixel only if all of the following hold. Otherwise the pixel restarts from the history-free result.
+- **Occurrence continuity:** the history was written by the immediately preceding RT occurrence of this framebuffer slot. That means the same framebuffer key, size and consumer configuration, scene framebuffer continuity, and no failure, reset or resource recreation.
+- **Current validity:** the current signal and receiver guides are valid.
+- **Admissible motion** (ADR-016 amendment). `Interpolated` also requires that stock motion can be aligned to the stored occurrence (below).
+- **In bounds:** the reprojected position lies inside the target.
+- **Geometric agreement:** the stored previous guides at that position agree, per bilinear tap, with the predicted previous linear depth (relative tolerance) and with the normal.
+- **Stored validity:** the stored history sample is valid.
+
+Surface identity equality is never evidence. Identity inequality is not used either, because irradiance history is location-based and lineage keys would only add false rejections. A future receiver-dependent signal (specular, non-demodulated radiance) must add its own receiver-consistency evidence. It must not reuse candidate lineage for that purpose.
+
+Occurrence alignment:
+- **Camera:** reprojection uses the view-projection stored with the history occurrence. This is exact, including across skipped HFR ticks.
+- **Stock object motion:** spans `prevFrameWeight → curFrameWeight`.
+  - Within one Workload, it is rescaled to the stored occurrence's weight. This is exact under linear interpolation.
+  - Across the adjacent Workload, it is extended at constant velocity. This is inexact: normally it covers one display tick, it is limited to half a game frame (heavy frame skipping is refused), and the geometric test guards it.
+  - Anything else makes `Interpolated` inadmissible.
+
+Radiometric change. There is no explicit light or source invalidation; the stage only bounds responsiveness, and establishes no radiometric validity. Implementation evidence refined the first design:
+- History length is bounded in *game frames* (6), not occurrences, because game state changes per Workload. The occurrence cap is 15.
+- History ages with normal change: irradiance depends on orientation, so a rotating surface keeps correspondence but not its irradiance.
+- The clamp uses raw-signal neighbourhood statistics. Spatial-result statistics collapse onto the current noisy estimate, which discarded accumulation and darkened converged history by 3.5%.
+- A moving actor's indirect-shadow lag on nearby receivers remains a measured, bounded limit.
+
+Sampling. The temporal backend requests a per-occurrence sequence index, and the GI hemisphere rotation advances with it. Without history, the fixed rotation remains: a varying seed without accumulation only adds shimmer.
+
+Boundary. The canonical per-occurrence inputs are:
+- raw signal: RGB, plus hit distance or −1;
+- linear depth (clip W);
+- world geometric normal;
+- replay-local primary identity;
+- a 2.5D motion guide: previous UV − current UV, predicted previous minus current linear depth, and admissibility;
+- current and previous camera, reset and sequence.
+
+The backend owns its history. Its output contract is unchanged: RGB and current support confidence, with W<0 invalid. Composition still gates on current raw validity.
+
+The project backend runs the unchanged ADR-011 spatial filter first, as the literal history-free path, then the temporal stage. Game semantics, source ownership, GI generation and composition stay outside the backend.
+
+External backends. FSR Ray Regeneration's indirect-diffuse contract maps onto these inputs through adapter-side conversion only:
+- RGBA16F radiance plus hit distance, where negative means inactive;
+- linear depth;
+- 2.5D motion;
+- world normal.
+
+Its required diffuse albedo does not exist in RT+:
+- The signal is already demodulated, so at most a labelled constant proxy is admissible. `surfaceResponse`, SHADE and authored colour are never substituted.
+- Roughness and material type get documented defaults.
+- Per-pixel motion admissibility cannot be expressed, so that backend would own its own disocclusion.
+
+It is DX12/RDNA4-only, while Vulkan is the qualified path. Its evaluation is a separate backend work package against this baseline.
+
+Source collection. This consumer selects GI source candidates per pixel and occurrence, and needs no source identity. The tested binding churn changed no selected candidate. Independent source availability (old WP2) is therefore not a prerequisite. Resume it when either of these appears:
+- a consumer that needs source-associated lifetime or identity: source-associated reuse, source presentation, or broad unbound local influence;
+- temporal GI evidence of visible artifacts driven by binding-derived population changes.
+
+Rejected:
+- Treating Tagged/Content identity with `Continuous` and trusted motion as history validity. The fixture disproves it.
+- Extending WP3 toward persistent object identity to make the fixture pass. That is unbounded and unneeded for a location-based signal.
+- Integrating a vendor SDK, or moving off Vulkan, before the canonical inputs are proven in-game.
+- Temporal-before-spatial ordering for the first backend. It would remove the unchanged spatial path as the exact fallback. It can be reconsidered by a later backend.
+
+Cost. Resources are allocated only while the temporal consumer is active: +32 B/pixel.
+- RGBA16F motion guide;
+- two RGBA16F history targets, one written per occurrence and read by composition;
+- two packed R32 previous guides (FP16 linear depth, 6:6 octahedral normal, 4-bit history length).

@@ -416,6 +416,7 @@ zelda64::renderer::RT64Context::RT64Context(uint8_t* rdram, ultramodern::rendere
     if (const char* v = std::getenv("RT64_RT_SPATIAL_LOCAL")) app->workloadQueue->rtSpatialLocal = std::atoi(v) != 0;
     if (const char* v = std::getenv("RT64_RT_GI")) app->workloadQueue->rtGI = std::atoi(v) != 0;
     if (const char* v = std::getenv("RT64_RT_GI_RAW")) app->workloadQueue->rtGIRaw = std::atoi(v) != 0;
+    if (const char* v = std::getenv("RT64_RT_GI_TEMPORAL")) app->workloadQueue->rtGITemporal = std::atoi(v) != 0;
     const char* localOverride = std::getenv("RT64_RT_LOCAL_LIGHTS");
     app->workloadQueue->rtLocalLights = localOverride ? std::strcmp(localOverride, "1") == 0 : cur_config.rt_local_lights;
     if (const char* view = std::getenv("RT64_LIGHTING_DEBUG")) app->workloadQueue->lightingDebug = std::clamp(std::atoi(view), 0, 31);
