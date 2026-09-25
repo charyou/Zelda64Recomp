@@ -24,7 +24,7 @@ Counters are written only when `environment[5].x` is set; `environment[5]` was a
 - Population churn (2.6k–5.3k triangles) is game culling. Room geometry is stable (885–1,156 triangles). Changes are dominated by tagged actors (skeletal NPC/prop limb groups) entering or leaving with view direction. Untagged draws use alternating frame-pool matrices and have no stable identity.
 - MM cullable-room entries entirely behind the camera now reach the RT scene through the adapter (`patches/terrain_transform_tagging.c`; A/B with `ZELDA64RECOMP_ROOM_OCCLUDERS=0`). Deterministic A/B: up to 427 extra triangles and up to about 860 extra blocked pixels per 400×240 frame, versus ±100 animation noise. Raster output is unchanged by construction.
 
-Remaining limits: off-screen culled actors do not cast, and there is no persistence (ADR-015). A full BLAS/TLAS rebuild still happens every occurrence. Clean 16-sample Town benchmark: AS build 0.40 ms of a 0.86 ms workload, repeated about 7× per game frame at HFR.
+Remaining limits: off-screen culled actors do not cast, and there is no persistence (ADR-015). At the time, a full BLAS/TLAS rebuild happened every occurrence (AS build 0.40 ms of a 0.86 ms workload, about 7× per game frame at HFR); superseded by the 2026-09-25 scene lifetime section below.
 
 ---
 
@@ -87,7 +87,7 @@ Receivers additionally require existing enhanced per-pixel-light eligibility, ca
 
 ## Resources and synchronization
 
-Existing world-write -> BLAS -> TLAS -> ray-trace barriers remain. Surface upload gets a read barrier; raw result transitions GENERAL -> SHADER_READ before raster. Per-framebuffer resource lifetime and existing waited graphics fence protect reuse. BLAS/TLAS rebuild every enabled replay. Surface metadata upload is currently recreated per replay; no object-space cache/refit redesign. Diagnostics use separate RGBA8 output and the existing target-matched FullScreenVS/TextureCopyPS inset. Both outputs are full target size; the optional inset displays at half size.
+Existing world-write -> BLAS -> TLAS -> ray-trace barriers remain. Surface upload gets a read barrier; raw result transitions GENERAL -> SHADER_READ before raster. Per-framebuffer resource lifetime and existing waited graphics fence protect reuse. (Run-1 state; see the 2026-09-25 section for the current build/refit/reuse lifetime and persistent upload buffers.) Diagnostics use separate RGBA8 output and the existing target-matched FullScreenVS/TextureCopyPS inset. Both outputs are full target size; the optional inset displays at half size.
 
 No new Plume modifications were needed. Run 1's committed nested Plume fixes remain: per-geometry Vulkan BLAS ranges, queried scratch alignment, consistent TLAS flags and actual AS device address. Preserve them across updates.
 
@@ -180,3 +180,12 @@ Root performed Vulkan RX9070XT checks using the existing copied mod profile, Enh
 Paused quantitative check: AO-only changed the40x42 post-contact region by mean RGB(-5.019,-3.109,-1.945), while open floor changed(-0.538,-0.312,-0.274), and sky was unchanged. This establishes localized production response beyond the earlier barely-visible pass. Fill separately brightened open floor and darkened enclosed shield surfaces. Those fill A/B captures use the earlier0.65 strength; final default reduced to0.4 after that evidence. See paused-pixel-check.txt. Final no-shadow attract smoke uses the reduced default; final captures/status are recorded in HANDOFF.
 
 Limits: submitted-geometry and one-world-camera coverage, conservative alpha/cutout exclusions, no broad MSAA/HFR/D3D12 runtime qualification, no performance benchmark. Deterministic sparse rays can show angular bands, geometric-normal seams or motion changes as geometry/hemispheres move. No denoising claim. The known sunrise transient and separate camera/geometry sun-shadow collapse remain undiagnosed and are not masked or declared fixed by this work.
+
+
+## 2026-09-25 — Scene lifetime, identity and requirements (ADR-016)
+
+- `src/render/rt64_raytracing_scene.h/.cpp::RaytracingSceneRecord` owns surfaces, provenance, BLAS/TLAS and continuity for one framebuffer slot. `RaytracingDebug` keeps consumer pipelines/textures and persistent upload buffers (surfaces, responses, sources, environment; exact view sizes).
+- Per occurrence: `beginOccurrence(submissionFrame, framebufferKey)` → `describe`/`addSurface` during the existing collection loop → `finalize` (continuity, motion, scene keys) → `prepare` (Built/Refit/Reused decision, allocation) → `recordBuild`.
+- Refit uses the new Plume `updateBottomLevelAS` (in place, same geometry descriptors and index data). The trace ABI and PrimaryHitRT are unchanged.
+- Developer series (`RT64_RT_SCENE_SERIES`) rows now include `requirements` and `scene` (blas action/reason, keys, identity/continuity/motion counts); `RT64_RT_SCENE_SERIES_SURFACES=1` adds per-surface provenance. Benchmark samples add `rt_scene` build/refit/reuse counts.
+- Evidence (Vulkan, RX 9070 XT, `_working-directory/diagnostics/2026-09-25-wp3/`): one full build per game frame, the remaining ~6 of 7 HFR occurrences refit; zero within-frame topology changes; a held Workload's full build and 8,842 refits give bit-identical trace counters; no counter discontinuity at build/refit boundaries.

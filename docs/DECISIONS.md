@@ -205,3 +205,55 @@ Decisions:
 - Actor draw culling is coupled to actor draw side effects and is not bypassed.
 - Stock transform-group IDs are the stable identity that any future persistence or temporal policy must key on. Untagged draws use frame-pool matrices and have no cross-frame identity.
 - Scene lifetime work (reuse per Workload, refit per HFR occurrence) is performance and temporal groundwork, not a shadow-completeness fix.
+
+**Amendment 2026-09-25 (ADR-016):** lifetime is implemented as one BLAS per game frame refit across its HFR occurrences. Untagged geometry still has no transform identity; exactly unchanged untagged geometry gets content identity, and nothing is retained beyond submission.
+
+## ADR-016 — The RT scene is a renderer-owned record with explicit lifetime, identity and requirements
+
+Status: accepted after Vulkan qualification, 2026-09-25. Implements the lifetime part of ADR-015; membership is unchanged.
+
+Owner and lifetime:
+- Each framebuffer slot owns one `RaytracingSceneRecord`, shared by every RT+ consumer of that framebuffer. There is still no scene spanning framebuffers or projections; that would change membership.
+- Surfaces are exactly this occurrence's submitted executable opaque ranges. GeometryIndex stays the occurrence-local surface index.
+- The game frame is the Workload submission. Continuity is per logical framebuffer: depth image, width, format and target size. Color images rotate through RDRAM every frame, so their address is excluded.
+
+Bottom-level structure:
+- One BLAS is fully built once per game frame, with updates allowed.
+- Later HFR occurrences of the same Workload refit it in place. Refit requires the same Workload, the same world-position and index buffers, and the same ordered index ranges, so index data is identical and only interpolated positions change.
+- When every surface is occurrence-invariant and the ordered exact content equals what the structure holds, the structure is reused without any build.
+- Anything else gets a full build. The TLAS (one identity instance) is rebuilt whenever the BLAS changes.
+- Plume gained a generic `updateBottomLevelAS` plus `allowUpdate`/`updateScratchSize` build info (Vulkan and D3D12; Metal RT remains unimplemented). No RT64 or MM policy lives in Plume.
+
+Surface provenance (CPU-side, backend-neutral; no GPU ABI change):
+- Per-transform matching provenance comes from the stock TransformProcessor: unassociated, matched unchanged (bitwise), or matched moved.
+- Keys:
+  - `topologyKey` is connectivity: relative indices and per-vertex transform slots;
+  - `shapeKey` is model-space positions;
+  - `contentKey` combines topology, shape, vertex velocity and raw world matrices, i.e. the exact world-space inputs.
+- Identity:
+  - `Tagged` comes from explicit gEXMatrixGroup IDs of the referenced transforms, the stock call-matching material key (combiner, other mode, geometry mode) and the submission ordinal within that key. Draw calls under one limb commonly differ only by texture state.
+  - `Content` is exact unchanged world-space inputs of untagged, occurrence-invariant geometry.
+  - `None` covers everything else. Continuity is New, Continuous, TopologyChanged or Ambiguous.
+- Motion:
+  - `Static` means exact content equality with the previous game frame;
+  - `Interpolated` means a matched Tagged identity with continuous topology and either unchanged shape or explicit vertex velocity;
+  - `Unknown` covers the rest. Stock `worldVelBuffer` (per display occurrence) is the canonical motion signal only for Static and Interpolated surfaces.
+- Heuristic AUTO matching, ambiguity, new geometry and unvelocitized deformation never produce trusted identity or motion. They still render through the conservative current-frame path.
+
+Requirements:
+- `RaytracingRequirements` names every consumer: insets, owned shadows, primary expansion, AO, environment fill, locals, spatial locals, GI, raw GI and diagnostic view. It derives scene need, guide need and the unchanged trace-mode ABI.
+- Stock `raytracingEnabled` again means only the legacy RT_ENABLED renderer.
+- `WorkloadConfiguration::rtPlusPrerequisites` states the genuine prerequisite: RT+ traces stock VertexProcessor world positions, whose inputs exist only for matched frames. It keeps matching and world-vertex processing active while any RT+ consumer is configured.
+- With no consumer, or with the master override off, there is no scene work.
+
+Rejected, with evidence:
+- A static/dynamic two-BLAS split. In Town, about 70% of RT triangles are animated tagged actors. AS build fell only from 0.40 to 0.30 ms, while two overlapping instances raised trace cost 24% at product resolution (1.18 to 1.47 ms). It was also slower at 20 Hz.
+- Per-object BLAS with TLAS transforms. N64 multi-matrix skinned triangles and non-affine matrices prevent it being universal, it needs an allocator, and it has no measured need.
+- A scene spanning framebuffers.
+- Refit across game frames. Index data is not guaranteed identical, and BVH quality would degrade without bound.
+- Using the color address in continuity.
+
+Consequences:
+- Future temporal consumers key history on Tagged/Content identity with explicit continuity, and use stock motion only for trusted motion classes.
+- A future derived caster or proxy, or an explicitly authorized finite emitter, can reference a surface's identity and topology/shape keys without replacing this lifetime.
+- Refit trace quality is bounded to one game frame of interpolation. Measured trace cost is unchanged.

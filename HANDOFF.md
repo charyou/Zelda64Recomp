@@ -1,58 +1,87 @@
-# Handoff — RT scene coverage and primary visibility authority, 2026-09-24
+# Handoff — RT scene lifetime / identity foundation (WP3), 2026-09-25
 
 ## Current state
 
-Uncommitted, commit-ready changes on top of parent `bff648c` / RT64 `ccb86d2` / Plume `91e6711`. The parent gitlink `lib/rt64` shows as modified; Plume and N64ModernRuntime are unchanged. The basis is `docs/reviews/RT_PLUS_ARCHITECTURE_REASSESSMENT_2026-09-24.md`; new durable decisions are ADR-014 and ADR-015 (plus an ADR-004 amendment).
+Uncommitted, commit-ready changes on top of parent `a102424` / RT64 `613c418` / Plume `91e6711`. Nothing is committed in any repository:
+- RT64 is modified, and its nested Plume is modified;
+- the parent shows the `lib/rt64` gitlink as modified plus docs;
+- N64ModernRuntime and the MM adapter are unchanged.
+
+The durable decision is ADR-016, with an ADR-015 amendment. The basis is `docs/reviews/RT_PLUS_ARCHITECTURE_REASSESSMENT_2026-09-24.md` (WP3).
 
 Implemented:
-- **Primary receiver depth coverage (F1).** `PrimaryRayGen` spans N64 GL-style NDC z −1..1. The old D3D-style 0..0.99 window dropped receivers nearer than about 20 units and farther than about 1.3k–1.7k units.
-- **Per-backend receiver clip W (F2).** RasterPS uses `1/SV_Position.w` only under `__spirv__` and `SV_Position.w` on DXIL. The SPIR-V path is byte-identical in behaviour.
-- **FullSync metadata.** A later FullSync inside the same task now carries `fogMode`/`perPixelLighting`/`atmosphere` into the next Workload (`rt64_state.cpp`); the next task still overwrites them.
-- **Environment directional visibility authority (ADR-014).**
-  - The adapter publishes `environmentDirection[i].w` = `smoothstep(0, 0.1, normalized y)`, from MM's `ActorShadow_DrawFeet` `dir.y > 0` rule (`src/main/rt64_render_context.cpp`).
-  - In RT64, authority scales owned-term shadowing (`lerp(1, traced, a)`), ADR-012 gain (`a·DirectAuthority`), ADR-013 additions (`traced·a`; no visibility means no addition) and GI primary transport. Authority 0 traces no primary rays.
-  - Expansion (bit 64) now requests its own visibility rays, so additions stay occluded with raster sun shadows off.
-  - `FramebufferParams.shadowSun` became `primaryVisibility` (traced, authority, reserved, owned-application); all layout sizes are unchanged.
-- **Room occluder completion (ADR-015).** The MM `Room_Draw` patch additionally submits opaque cullable-room entries whose bounding sphere is entirely behind the camera (the exact complement of MM's test). They produce zero raster pixels; XLU order and the beyond-zFar cull are unchanged. Host import `recomp_room_occluder_completion_enabled` (0x8F0000EC); `ZELDA64RECOMP_ROOM_OCCLUDERS=0` gives A/B.
-- **Scene series (developer).** `RT64_RT_SCENE_SERIES=<file>` writes per-occurrence JSONL of CPU collection facts, stock transform-group identity triangles and production raygen counters. They are written only when `environment[5].x` is set (formerly a dead duplicate); there is no policy input.
-- **API logging.** Startup stderr logs the requested and chosen graphics API.
+- **Scene record.** `RaytracingSceneRecord` (`lib/rt64/src/render/rt64_raytracing_scene.*`) is the per-framebuffer owner shared by all RT+ consumers. It holds surfaces, provenance, BLAS/TLAS and continuity. Membership is unchanged: exactly the submitted ranges.
+- **Lifetime.**
+  - One BLAS gets a full build (allowing updates) once per game frame (Workload submission).
+  - It is refit in place for later HFR occurrences of the same Workload, i.e. the same buffers and ordered index ranges.
+  - It is reused without any build when all content is occurrence-invariant and exactly unchanged.
+  - The TLAS is rebuilt whenever the BLAS changes.
+- **Plume.** A generic `updateBottomLevelAS` plus `allowUpdate`/`updateScratchSize` (Vulkan and D3D12; Metal RT remains unimplemented and is stubbed).
+- **Identity and motion provenance.** CPU-side only; there is no GPU ABI change.
+  - The stock TransformProcessor now records per-transform matching provenance (`DrawData::worldTransformProvenance`).
+  - Surfaces carry topology, shape and content keys.
+  - Identity is Tagged (group IDs, material key and ordinal), Content (exactly unchanged untagged geometry) or None.
+  - Continuity and motion (Static, Interpolated, Unknown) are defined in ADR-016. Heuristic, ambiguous and new geometry fail closed but still render.
+  - Provenance is computed once per game frame and reused by its HFR replays.
+- **Requirements.**
+  - `RaytracingRequirements` names every consumer and derives the unchanged trace modes.
+  - Stock `raytracingEnabled` is again legacy-only.
+  - `rtPlusPrerequisites` explicitly keeps frame matching and world vertices active: they are a real prerequisite of RT+ world positions.
+- **Other changes.**
+  - Persistent upload buffers replace per-occurrence buffer creation.
+  - The RT camera falls back to unprocessed view-projection when projection processing did not run (previously an out-of-range read).
+  - Developer series and benchmark samples report build, refit and reuse.
+- **Removed.** The per-occurrence full rebuild and the per-occurrence surface/source/response/environment buffer allocations. A static/dynamic two-BLAS prototype was built, measured and removed (see ADR-016).
 
 ## Build
 
-Final full build (patches ELF, N64Recomp patches, all RT/raster SPIR-V/DXIL consumers, executable) passed. Executable SHA256 `4774970C324DD3C9F6249009F1D8276C979294E314831FD491DCAA3344E68128` at `_working-directory/build-zelda-validation/Zelda64Recompiled.exe`. Build script: `_working-directory/diagnostics/2026-09-24-scene/build.ps1`.
+A full build passed: CPU, the Plume Vulkan/D3D12 backends, the patches, and the executable. PrimaryHitRT is unchanged; its SPIR-V/DXIL was regenerated during development, and the final shader source equals HEAD.
+- Executable SHA256: `22ED66AC022F4B8FACEF7623B0FB4BBFE3D5CFB7A7D3FA348B68ACD1922052D2`.
+- Path: `_working-directory/build-zelda-validation/Zelda64Recompiled.exe`; a copy is in `…/diagnostics/2026-09-25-wp3/candidate/`.
+- Build script: `_working-directory/diagnostics/2026-09-25-wp3/build.ps1`.
 
-## Runtime evidence (Vulkan RX 9070 XT, `_working-directory/diagnostics/2026-09-24-scene/`)
+## Runtime evidence (Vulkan, RX 9070 XT; `_working-directory/diagnostics/2026-09-25-wp3/`)
 
-**Camera motion**, deterministic `motion-arc.json` in noon Town, 20 Hz and HFR:
-- No whole-frame RT disable. World-camera agreement never rejected a range. HFR occurrences of one game frame carry identical scenes.
-- The old window lost 8–30% of primary hits near the camera in motion and up to 43% of the frame against walls (`motion13-old-vs-new.png`, view 13). The far loss was 1.4% of hits in Termina Field.
-- Remaining triangle churn is game culling, dominated by tagged actors. Room geometry is stable. Room occluder A/B added up to 427 triangles and about 860 blocked pixels per frame.
+**Benchmarks.** Town noon, still, 16 samples, medians. The baseline is the HEAD executable in `baseline/`. Full numbers are in `performance.txt`.
 
-**Night 23:00:**
-- The primary points down (y −0.98) with RGB (0.39, 0.51, 0.24). The old build traced these rays into the ground; visibility gating alone over-brightened undersides via the 1.77× gain.
-- The final build traces 0 rays and matches the authored magnitude (`night-link-4way.png`).
-- The arch shading on the wall is authored (present with master off).
+| config | whole | AS build | trace | classification CPU |
+|---|---|---|---|---|
+| 144 Hz, Auto res, MSAA4X (product path) | 2.388 → 2.047 ms | 0.396 → 0.047 ms | 1.184 → 1.175 | 1.51 → 1.52 ms |
+| 144 Hz, low res | 0.813 → 0.492 | 0.390 → 0.047 | 0.145 → 0.157 | 1.37 → 1.47 |
+| 20 Hz, low res | 0.893 → 0.775 | 0.405 → 0.321 | 0.160 → 0.161 | 1.44 → 1.93 |
 
-**Noon:** authority 1, all hits traced. With raster shadows off, visibility is still traced for expansion.
+- At HFR, about 0.19 of samples are full builds (about 0.37 ms each) and the rest are refits.
+- At 20 Hz every occurrence is a new frame (one build). The +0.5 ms CPU there is provenance and classification once per game frame.
+- The 20 Hz AS reduction is observed but not attributed.
 
-**Benchmark** (clean 16-sample Town noon, old/new): whole 0.851/0.863 ms, AS build 0.397/0.398 ms, fused RT 0.161/0.150 ms, no resource growth (`performance.json`). Neutral.
+**Correctness.**
+- **HFR motion series** (`wp3r-hfr-*`, `prod-visual-*`): exactly one full build per game frame, refits for the other ~6 occurrences, and zero within-frame topology changes. There are no RT failures.
+- **Refit exactness.** A held Workload (FixedRepeat) gets 1 full build plus 8,842 refits with bit-identical trace counters.
+- **Refit under motion.** Counter step distributions into full builds and between refits are identical (no boundary discontinuity).
+- **Identity and motion.** Tagged and content identity stay about 99% continuous across frames. Motion splits into roughly 67% Interpolated (animated actors), 32% Static and 1% Unknown.
+- **No-consumer and master off.** There is no RT initialization, no AS/trace pass and no scene work.
+- **Native.** The presentation shortcut keeps the enhanced replay running underneath (pre-existing). The RDRAM path was not touched.
+- **`bastian` fixture.**
+  - Harness: `bastian.ps1`. It copies the "Bastian" slot into a run-local slot 1 and advances dialogs with periodic A.
+  - The first playable Lost Woods clearing (around 250–270 s after launch) is equivalent between baseline and candidate.
+  - It is underlit because the adapter publishes a warm upward primary with visibility authority 1.0 in this enclosed forest, so the traced sun is occluded by the canopy. This is a separate Source/Responsibility fixture, unrelated to WP3.
+- **Device loss.** One device loss occurred, only in an early 20 Hz run of the removed two-partition prototype. It was not seen in about 20 launches of the final design.
 
 ## Limits / open
 
-- **D3D12 runtime is unqualified.** RT64 forces Vulkan on RDNA4 drivers ≤ Aug 2026 even when D3D12 is requested; the DXIL clip-W convention is verified only at DXC level. The earlier view-13 "D3D12" captures were actually Vulkan.
-- Off-screen culled actors do not cast (actor draw culling is gameplay-coupled; no persistence, per ADR-015).
-- The secondary directional is published with authority but has no RT visibility realization.
-- A full BLAS/TLAS rebuild still happens every framebuffer × occurrence (AS build is about 46% of the workload; about 7× per game frame at HFR).
-- Temporal identity, motion, reconstruction seam and the semantic packet transport (reassessment F3/F5/F8/F9/F10) are unchanged.
-- No broad scene/mod/MSAA qualification. Physical F9 delivery remains unqualified as before.
+- **D3D12 runtime is unqualified.** D3D12 was requested but Vulkan was chosen (RDNA4 workaround). The new D3D12 update path is compile-verified only.
+- **Not yet consumed.** Identity, continuity and motion are established on the CPU but no consumer reads them. There is no per-pixel motion/ID guide, frame seed or history, which are intended for WP4.
+- **Refit scope.** Refits never cross game frames, so each new game frame pays one full build. Per-object instancing was rejected for now.
+- **Not qualified this pass.** A local/GI interior case, MSAA snapshot capture and mod stacks were not specifically re-qualified; product-path MSAA4X runs rendered correctly.
+- **Earlier limits still stand.** Off-screen culled actors do not cast (ADR-015). The secondary directional has no visibility realization.
 
 ## Next
 
-The scene lifetime package:
-- a per-Workload static/dynamic partition keyed by stock transform groups;
-- reuse or refit across HFR occurrences (Plume has no AS update API yet; a static/dynamic BLAS split needs none);
-- a separate RT+ requirement flag instead of the repurposed stock `raytracingEnabled`.
+**WP4:** a reconstruction seam and the first temporal backend on ADR-016 provenance. It needs:
+- a per-pixel surface identity and motion guide derived from stock `worldVelBuffer`, only for trusted motion classes;
+- history validity and disocclusion;
+- a frame seed.
 
-Then source collection with stable IDs (F3), reusing ADR-014's per-source authority pattern.
+The Source/Responsibility work (WP2), including the `bastian` authority case, remains separate.
 
-Preserve the supplied untracked `docs/AGENTS_RT64.md`, `docs/MM_LIGHTING_INSTRUMENTATION_SOURCE_MAP.md`, `docs/input-research/`, the untracked older reviews and `lib/rt64.7z`. Generated `CHANGELOG.md` stays with its release workflow.
+Preserve the supplied untracked `docs/AGENTS_RT64.md`, `docs/MM_LIGHTING_INSTRUMENTATION_SOURCE_MAP.md`, `docs/input-research/`, the older reviews, `start-rtplus-dev.bat` and `lib/rt64.7z`. The generated `CHANGELOG.md` stays with its release workflow.

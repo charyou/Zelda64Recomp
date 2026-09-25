@@ -1,5 +1,14 @@
 # Internal Changelog
 
+## 2026-09-25 — RT scene lifetime / identity foundation (WP3)
+
+- New renderer-owned `RaytracingSceneRecord` per framebuffer: one BLAS fully built once per game frame, refit in place for the Workload's other HFR occurrences, exact reuse when all content is invariant and unchanged. Membership unchanged (ADR-015). Generic Plume `updateBottomLevelAS` (Vulkan/D3D12). ADR-016.
+- CPU-side provenance: stock matching per-transform provenance; surface topology/shape/content keys; Tagged/Content/None identity with continuity; Static/Interpolated/Unknown motion (stock `worldVelBuffer` valid only for trusted classes). Heuristic/ambiguous/new geometry fails closed and still renders. No GPU ABI change.
+- `RaytracingRequirements` replaces the overloaded stock `raytracingEnabled` (legacy-only again); `rtPlusPrerequisites` explicitly keeps matching/world vertices. No consumer or master off: no scene work. Persistent RT upload buffers; RT camera falls back to unprocessed view-projection when projections were not processed.
+- A static/dynamic two-BLAS split was built and rejected on evidence: AS 0.40→0.30 ms but trace +24% at product resolution from overlapping instances. MM's colour-image rotation also broke framebuffer continuity until the colour address was excluded from the key.
+- Product path (144 Hz, Auto, MSAA4X): whole 2.39→2.05 ms, AS 0.40→0.05 ms median, trace neutral. Held Workload: build + 8,842 refits give identical trace counters. `bastian` Lost Woods gameplay equivalent to baseline; its underlighting traces to an authority-1 upward primary occluded by the canopy (separate WP2 fixture). D3D12 requested → Vulkan chosen; unqualified. Final exe `22ED66AC…2052D2`.
+- Release-note summary: Enhanced RT+ rebuilds its ray-tracing scene far less often at high frame rates, lowering GPU cost with identical lighting.
+
 ## 2026-09-24 — RT receiver coverage, camera-motion classification, primary visibility authority
 
 - Implemented from the architecture reassessment:
