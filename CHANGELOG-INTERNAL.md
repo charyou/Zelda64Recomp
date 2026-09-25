@@ -1,5 +1,11 @@
 # Internal Changelog
 
+## 2026-09-25 — Pre-next-work-package identity and local-source validation
+
+- A deterministic CPU fixture using production `RaytracingSceneRecord::describe/finalize` reproduced false Tagged correspondence after reorder and insertion/removal of equal-input surfaces. Explicit vertex velocity can make the wrong ordinal correspondence `Continuous` and `Interpolated`. ADR-016 provenance needs a separate correspondence/history-validity guard before temporal consumption; no renderer policy was changed.
+- No-input attract capture covered traced Workloads 104–8918: one complete 6,160-Workload cycle and part of the next, plus focused scene-108 repeats. A source addition at Workload 1776 was genuine game radius activation. A later stable game point was absent from verified binding/RSP collection, then added after a successful binding opportunity; one-record list loss/return reproduced across runs and the next cycle. No 64-source cap effect. The changing record was selected by zero current Direct/GI pixels in indexed confirmations, so material collected-source candidate churn was not demonstrated there.
+- Added gated source-value and candidate-index diagnostics, a CPU identity fixture, and the concise evidence report `docs/reviews/RT_PLUS_PRE_NEXT_WP_VALIDATION_2026-09-25.md`. Full executable/fixture builds and a diagnostics-disabled intro smoke run passed. Diagnostic executable SHA256 `C0BC3E12…6AEAB8AD`; captures/scripts remain in ignored `_working-directory/diagnostics/2026-09-25-wp3/`. No WP2/WP4 work or release-note change.
+
 ## 2026-09-25 — RT scene lifetime / identity foundation (WP3)
 
 - New renderer-owned `RaytracingSceneRecord` per framebuffer: one BLAS fully built once per game frame, refit in place for the Workload's other HFR occurrences, exact reuse when all content is invariant and unchanged. Membership unchanged (ADR-015). Generic Plume `updateBottomLevelAS` (Vulkan/D3D12). ADR-016.
