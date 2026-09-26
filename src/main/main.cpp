@@ -7,6 +7,7 @@
 #include <numeric>
 #include <stdexcept>
 #include <cinttypes>
+#include <csignal>
 
 #include "nfd.h"
 
@@ -144,7 +145,18 @@ ultramodern::renderer::WindowHandle create_window(ultramodern::gfx_callbacks_t::
     flags |= SDL_WINDOW_VULKAN;
 #endif
 
-    window = SDL_CreateWindow("Zelda 64: Recompiled", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1600, 960,  flags);
+    // Developer launch override (ZELDA64RECOMP_DEV_WINDOW_SIZE=WxH): with Auto resolution the internal render
+    // target follows the client size, so qualification runs can pin a product-quality resolution.
+    int window_width = 1600, window_height = 960;
+    if (const char* size = getenv("ZELDA64RECOMP_DEV_WINDOW_SIZE")) {
+        int w = 0, h = 0;
+        if ((sscanf(size, "%dx%d", &w, &h) == 2) && (w >= 320) && (h >= 240)) {
+            window_width = w;
+            window_height = h;
+        }
+    }
+
+    window = SDL_CreateWindow("Zelda 64: Recompiled", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, window_width, window_height,  flags);
 #if defined(__linux__)
     SetImageAsIcon("icons/512.png",window);
     if (ultramodern::renderer::get_graphics_config().wm_option == ultramodern::renderer::WindowMode::Fullscreen) { // TODO: Remove once RT64 gets native fullscreen support on Linux
@@ -448,6 +460,57 @@ namespace zelda64 {
 
 #ifdef _WIN32
 
+// Developer crash trace (ZELDA64RECOMP_CRASH_TRACE=1): prints module-relative stacks for C++ throws and
+// aborts to stderr, for environments without a debugger. Symbolize with llvm-symbolizer against the PDB.
+static void print_crash_stack(const char* what) {
+    void* frames[48];
+    const USHORT count = CaptureStackBackTrace(1, 48, frames, nullptr);
+    fprintf(stderr, "[Crash trace] %s\n", what);
+    for (USHORT i = 0; i < count; i++) {
+        HMODULE module = nullptr;
+        char path[MAX_PATH] = "?";
+        if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCSTR)frames[i], &module)) {
+            GetModuleFileNameA(module, path, MAX_PATH);
+        }
+        const char* name = strrchr(path, '\\');
+        fprintf(stderr, "  #%02u %s+0x%llx\n", i, name ? name + 1 : path, (unsigned long long)((uintptr_t)frames[i] - (uintptr_t)module));
+    }
+    fflush(stderr);
+}
+
+static LONG CALLBACK crash_trace_handler(EXCEPTION_POINTERS* info) {
+    const DWORD code = info->ExceptionRecord->ExceptionCode;
+    if (code == 0xE06D7363) {
+        const std::exception* e = nullptr;
+        if (info->ExceptionRecord->NumberParameters >= 3) {
+            e = reinterpret_cast<const std::exception*>(info->ExceptionRecord->ExceptionInformation[1]);
+        }
+        char message[4096];
+        // Only std::exception-derived throws with the base at offset 0 are expected from RT64; the D3D12
+        // runtime's internal throws are printed by address only.
+        const bool fromApplication = (info->ExceptionRecord->NumberParameters >= 4) &&
+            (info->ExceptionRecord->ExceptionInformation[3] == (ULONG_PTR)GetModuleHandleA(nullptr));
+        snprintf(message, sizeof(message), "C++ throw (thread %lu): %s", GetCurrentThreadId(), (fromApplication && e) ? e->what() : "(foreign)");
+        print_crash_stack(message);
+    }
+    else if ((code == EXCEPTION_ACCESS_VIOLATION) || (code == EXCEPTION_STACK_OVERFLOW) || (code == EXCEPTION_ILLEGAL_INSTRUCTION)) {
+        char message[128];
+        snprintf(message, sizeof(message), "SEH 0x%08lX at %p", code, info->ExceptionRecord->ExceptionAddress);
+        print_crash_stack(message);
+    }
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void install_crash_trace() {
+    const char* enabled = getenv("ZELDA64RECOMP_CRASH_TRACE");
+    if (!enabled || strcmp(enabled, "1") != 0) {
+        return;
+    }
+    AddVectoredExceptionHandler(1, crash_trace_handler);
+    signal(SIGABRT, [](int) { print_crash_stack("abort"); });
+    fprintf(stderr, "[Crash trace] installed\n");
+}
+
 struct PreloadContext {
     HANDLE handle;
     HANDLE mapping_handle;
@@ -579,6 +642,9 @@ int main(int argc, char** argv) {
 
     // Map this executable into memory and lock it, which should keep it in physical memory. This ensures
     // that there are no stutters from the OS having to load new pages of the executable whenever a new code page is run.
+#ifdef _WIN32
+    install_crash_trace();
+#endif
     PreloadContext preload_context;
     bool preloaded = preload_executable(preload_context);
 
