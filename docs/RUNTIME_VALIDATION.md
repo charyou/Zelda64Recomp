@@ -188,4 +188,38 @@ keyboard-state array used by gameplay input.
 
 Developer input playback is deterministic enough for frame-matched A/B: camera positions matched on all 1,390 common frames.
 
-Verify the actual backend in stderr (`[RT64] Graphics API requested=… chosen=…`). On RDNA4 drivers up to Aug 2026, RT64 forces Vulkan even when D3D12 is requested.
+Verify the actual backend in stderr (`[RT64] Graphics API requested=… chosen=…`). On RDNA4, `Auto` still chooses Vulkan; an explicit D3D12 request is honored (2026-09-25).
+
+## D3D12 and backend-evaluation loop (2026-09-25)
+
+`_working-directory/diagnostics/2026-09-25-d3d12-rr/` contains:
+- `quick.ps1`: optional build, then one visible uncaptured launch reporting the exit code. `-Ffx` stages the FidelityFX DLLs; `-Agility` stages a local Agility runtime (diagnostic only).
+- `matrix.ps1`: raw / spatial / project temporal / Ray Regeneration bursts on one binary.
+- `score.py`: noise, energy, reprojected instability and triangle-edge faceting per backend. `apicompare.py`: buffer-level API/run comparison. `receivers.py`: attributes visible pixels without GI to the recorded receiver gate. `benchsum.py`: benchmark medians.
+
+The shared `2026-09-25-wp3/run.ps1` copies any `amd_fidelityfx_*.dll` found beside `-Exe` into the run.
+
+Developer hooks for environments without a debugger or the D3D12 SDK layers:
+- `ZELDA64RECOMP_CRASH_TRACE=1` prints module-relative stacks for C++ throws, access violations and aborts. Symbolize them with `llvm-symbolizer --obj=<exe> --relative-address <offset>` against the matching PDB. D3D12Core throws internally during normal device creation; those frames are expected.
+- `PLUME_D3D12_DRED=1` enables Device Removed Extended Data and prints breadcrumbs and page-fault allocations on the first device-removed result.
+- `ZELDA64RECOMP_DEV_WINDOW_SIZE=WxH` sets the initial client size. With `Resolution=Auto` the internal target follows it, which pins product-quality resolutions such as 1920×1080.
+
+Product-resolution captures:
+- `Auto` resolution snaps to multiples of 240 lines. A ~1080-line window gives a 2134×1200 target, which satisfies the 1080p floor.
+- Native snapshots are capped at 32 MiB per resource and, by default, 32 MiB per occurrence. `RT64_LIGHTING_CAPTURE_SLICE_MIB=512` together with `BudgetMiB=4096` allows full 1920×1080 crops of every RT+ resource. Use `CropX=107 CropY=60` to centre the crop on 2134×1200.
+
+Cross-API qualification (2026-09-26):
+- Compare the **final composed raster** of the same binary on both APIs, in matched states: at least a day and a night state, and both Atmospheric and Original fog. Intermediate RT+ signals being equivalent does not establish this. A D3D12 descriptor-layout defect left every intermediate signal correct while the final image lost half its energy.
+- `2026-09-26-d3d12-perpixel/` holds the harness:
+  - `controlled-run.ps1` and `controlled-run2.ps1` (`-Resize`, `-WindowShot`);
+  - `matrix.ps1`: the fixed-candidate API × fog × time matrix;
+  - `diffpair.py`, `pair.py` and `stitch.py`.
+- `decode_raster.py` writes `raster-raw-view.png` (the UNORM values as presented) and the older `raster-srgb-view.png`. The latter applies an extra 1/2.2 lift and is not what the user sees; judge appearance on the raw view.
+- Diagnostic view 12 (`RT64_LIGHTING_DEBUG=12`: R = normal magnitude, G = interpolated normal length) is a cheap first split for per-pixel lighting inputs. It is black, not magenta, when lighting runs but its inputs are zero.
+
+Historical-binary oracle: older executables lack `ZELDA64RECOMP_DEV_WINDOW_SIZE` and cap native staging at 32 MiB per occurrence.
+- `resize-window.ps1` sizes their window client to 1920×1080 from outside, which gives the same 2134×1200 Auto target, and leaves the executable unchanged.
+- Native raster is then taken as 640×360 tiles from separate deterministic runs (960×540 exceeds the cap) and stitched by `stitch.py`.
+- `window-shot.ps1` adds a presentation-level client capture. Screen captures require that no other window overlaps the client.
+
+Hidden-window launches do not initialize RT on either API. Use `Visible` for any RT evidence. The run-to-run floor of the deterministic playback is not zero: two Vulkan runs of the same binary differed on 6.5% of pixels in one pair and under 1.2% in others, so API comparisons must be judged against a same-API repeat.

@@ -55,6 +55,7 @@ The GI hemisphere rotation advances each occurrence by a golden-ratio sequence o
 ## Controls and diagnostics
 
 - Session toggle (default on within GI): F1 Lighting → "GI temporal history (session)". Launch override: `RT64_RT_GI_TEMPORAL=0/1`. It requires GI. Turning it off returns exactly to the history-free spatial path, and its resources are no longer written.
+- `RT64_RT_GI_RECONSTRUCTION=rayregen` selects the optional Ray Regeneration temporal backend (below). Scene-series rows report `temporal.backend`.
 - `RT64_RT_GI_TEMPORAL_TUNING=maxLength,clampGamma,depthTolerance,normalAgreement` is a developer qualification override with a fixed occurrence length. It is not a product setting.
 - Native snapshots (`RT64_LIGHTING_CAPTURE=snapshot|burst`) add `motion`, `spatialReconstruction` and `temporalGuide`. `reconstruction` is the composition input.
 - Scene series rows (`RT64_RT_SCENE_SERIES`) gain a `temporal` object: continuity, reset reason, object-motion admissibility and scale, history reuse, weights and effective length.
@@ -107,22 +108,97 @@ A fused spatial+temporal dispatch would save the 8 B/pixel spatial result and on
 - **Radiometric change is only bounded, never detected.** A moving actor's indirect occlusion or bounce lags on nearby receivers. On ground within about 50 units of a rapidly turning Link at 20 Hz this measured 8–20%, and it does not depend on the history bound, because those pixels already hold 2–4 samples. Light switching, local-source flicker and value changes behave the same way: they are smoothed within the clamp and the bound.
 - **HFR game-frame boundaries:** object motion over the stored occurrence's remaining part of the previous interval is a constant-velocity guess (at most ½ frame). The geometric test guards large errors.
 - **Correspondence tolerance:** a coincident different surface (same depth and normal within tolerance) is accepted. This is correct for location-based irradiance but not for receiver-dependent signals.
-- **Scope:** HFR image metrics and D3D12 are unqualified. So are receivers under local-heavy source churn, and mods with dense deforming geometry, where `Unknown` motion means history is always restarted.
+- **Scope:** D3D12 is qualified (ADR-018), on intermediate signals and, since the Plume descriptor-layout fix, on the final composed image. HFR image metrics remain unqualified. So do receivers under local-heavy source churn, and mods with dense deforming geometry, where `Unknown` motion means history is always restarted.
 - **Resolution:** the temporal stage runs at the full target resolution. There is no half-resolution or upscaling path.
 
-## External backends (not integrated)
+## Optional vendor backend: AMD FSR Ray Regeneration 1.2 (ADR-018)
 
-AMD FSR Ray Regeneration 1.2 (FSR SDK 2.3; DX12, SM 6.6, RDNA4+, ML-based, history owned internally). Its indirect-diffuse inputs map as follows:
+The backend is D3D12-only, needs RDNA4 or later and SM 6.6, and keeps its history inside the vendor context.
+- **Selection:** `RT64_RT_GI_RECONSTRUCTION=rayregen` while the temporal consumer is active.
+- **Build:** configure `RT64_FFX_SDK_DIR` to the SDK's `Kits/FidelityFX` directory. The MIT API headers are not vendored.
+- **Runtime:** place `amd_fidelityfx_loader_dx12.dll` and `amd_fidelityfx_denoiser_dx12.dll` next to the executable. `RT64_FFX_LOADER_PATH` overrides the loader location.
+- **Fallback:** when the backend is unavailable (Vulkan, missing DLL, no provider, SM < 6.6), the project temporal backend runs and the reason is logged once.
 
-| FSR input | RT+ source | Classification |
+Pipeline:
+1. The unchanged project spatial stage runs.
+2. An adapter pass runs (`IndirectRayRegenInputsCS`).
+3. The vendor dispatch runs on the same command list. Afterwards Plume is told that the descriptor heaps changed.
+4. An output pass (`IndirectRayRegenOutputCS`) writes the canonical contract. RGB is the vendor result. W is the spatial support confidence (−1 invalid), so composition validity and authority are identical across backends.
+
+| Vendor input | Adapter mapping |
+|---|---|
+| Indirect diffuse RGBA16F, A = hit distance | `rawIndirect` bound directly (demodulated; W<0 inactive) |
+| Linear depth R32F | clip W. The vendor documents +Z-forward view space; the adapter mirrors the N64 −Z view and folds the mirror into the projection. |
+| Motion, scale (1,1,1) | the canonical guide XYZ where admissible. Where W = 0: best-effort camera-only reprojection of the primary hit, located on the pixel ray by its clip W. The vendor owns disocclusion. |
+| Normals (RGBA16F) | vendor octahedral encoding of the geometric guide normal; roughness 1; material 0 for active pixels, 1 where raw W < 0. The material channel carries validity only: without it the vendor mixed inactive zero RGB into receivers. |
+| Diffuse albedo | labelled neutral-white proxy (sqrt 1). Never SHADE, `surfaceResponse` or authored colour. |
+| Specular albedo | zero-initialized resource (no specular signal; the vendor validator requires it) |
+| View / projection | RSP world-to-view, and `inverse(view) × viewProjection × screen`. It must be a perspective; otherwise the occurrence uses the spatial result and the next dispatch resets. |
+| Camera delta, frame index, reset | inverse-view translation delta; per dispatch; reset when the ADR-017 continuity chain breaks or a dispatch was skipped |
+
+Tuning:
+- Stability bias defaults to **0.25**. The vendor default of 1.0 converged to 0.86 of the spatial energy on RT+'s sparse four-ray signal.
+- Measured energy against the spatial estimate, by stability bias: 0 → 0.963, 0.25 → 0.965, 0.5 → 0.956, 1.0 → 0.86. These are 400×240 values with the old receiver coverage; product values are below.
+- Pre-exposure ×16 and `radiance_clip_std_k` = 1000 changed nothing.
+- Overrides:
+  - `RT64_RT_RAYREGEN_CONFIG=key=value,…` sets the vendor keys (1 cross-bilateral normal strength, 2 stability bias, 3 max radiance, 4 radiance clip k, 5 kernel relaxation, 6 disocclusion threshold).
+  - `RT64_RT_RAYREGEN_VALIDATION=1` turns on vendor validation. The final build runs clean.
+
+### Comparison (D3D12, RX 9070 XT, Clock Town noon, product target 2134×1200)
+
+`Auto` resolution snaps to multiples of 240 lines, so ~1080-line windows give a 2134×1200 target. Captures are full 1920×1080 centred crops. Scripts: `_working-directory/diagnostics/2026-09-25-d3d12-rr/` (`matrix.ps1`, `score.py`, `energybins.py`, `montage.py`, `bench-set.ps1`, `benchsum.py`). The binary for images carries the old receiver gate. The composition input is scored: `rawIndirect` for raw, `reconstruction` otherwise.
+
+| Metric | Raw | Spatial | Project temporal | Ray Regeneration |
+|---|---|---|---|---|
+| Noise, still | 0.0100 | 0.0029 | 0.00088 | 0.00045 |
+| Noise, fast turn | 0.0103 | 0.0024 | 0.00122 | 0.00036 |
+| Reprojected instability, turn | 0.0112 | 0.0029 | 0.00090 | 0.00077 |
+| Energy vs spatial, still / turn | — | 1 | 0.997 / 1.029 | 0.980 / 0.991 |
+| Soft-edge step, absolute (edge − interior) | 0.0059 | 0.0034 | 0.0023 | 0.0024 |
+| Edge / interior ratio | 1.42 | 1.92 | 4.11 | 14.8 |
+
+With the widened receiver gate the whole frame participates. Project and Ray Regeneration then measured noise 0.00064 / 0.00031 and energy 1.001 / 0.989.
+
+Images:
+- Ray Regeneration is the cleanest on flat ground and walls.
+- During the fast turn it softens real low-frequency contact detail: the crisp darkening under crates becomes a soft gradient.
+- The project backend keeps the detail but shows low-frequency mottling.
+- The final composites differ subtly, because GI is a bounded share of ambient.
+
+Cost: GPU medians of 16 samples, product configuration (MSAA4X, 144 Hz, still camera), `bench-set.ps1`.
+
+| Setting | Reconstruction ms | Trace ms | Whole Workload ms |
+|---|---|---|---|
+| D3D12, GI off | — | 1.617 | 2.534 |
+| D3D12 spatial | 0.319 | 2.011 | 3.321 |
+| D3D12 project temporal | 0.404 | 2.040 | 3.396 |
+| Vulkan project temporal | 0.443 | 2.014 | 3.449 |
+| D3D12 Ray Regeneration | 3.392 | 2.064 | 6.489 |
+
+Memory:
+- **Ray Regeneration:** the vendor reports 321.2 MiB at 2134×1200 (236.4 MiB aliasable, so about 85 MiB persistent), and 23.8 MiB at 400×240. The adapter adds 40 B/pixel (about 100 MB).
+- **Project temporal:** +32 B/pixel (82 MB).
+
+Conclusions:
+- The backend fits the boundary without changing guides, composition or source handling.
+- It is the stronger denoiser.
+- At about 8× the reconstruction cost, for a component that is a bounded share of ambient, it is not the product default.
+
+### Low-poly faceting
+
+Faceting originates in the signal and normal representation.
+- GI is gathered over the per-triangle geometric normal hemisphere (`cross(b − a, c − a)`).
+- The normal guide is that same normal: 11–12° across soft edges on low-poly actors.
+- The raw signal already carries the full edge step. No backend adds it.
+- Denoising removes the interior noise that masked it, so facets are *more* visible with better backends. Ray Regeneration is the most visible, because it respects normal discontinuities.
+
+Changing the normal semantics (for example, a smooth shading-normal GI hemisphere) is a separate GI-generation decision. It was not taken here.
+
+### Other Ray Regeneration signals (not integrated)
+
+| Signal | Existing RT+ source | Missing authoritative input |
 |---|---|---|
-| Indirect diffuse RGBA16F, A = hit distance (negative inactive) | `rawIndirect` (W=−1 invalid) | Available; semantics match (demodulated radiance) |
-| Linear depth R32F (signed view z) | clip W | Derivable (sign and format conversion in the adapter) |
-| Motion RGBA16F: prevUV − curUV, B = prev − cur linear depth | `motion` XYZ | Available for admissible surfaces. FSR has no per-pixel admissibility input: the adapter must supply best-effort stock motion for `Unknown` surfaces and rely on the vendor's own disocclusion. |
-| Normals RGB10A2: octahedral normal, B roughness, A material ID | `spatial.zw` | Normal available. Roughness is irrelevant for the diffuse-only signal (constant). Material ID: constant 0. |
-| Diffuse albedo RGBA8 (required when a diffuse signal is enabled) | none | **Unavailable.** The signal is already demodulated, so only a labelled constant proxy (white) is admissible. Never `surfaceResponse`, SHADE or authored colour. |
-| Specular albedo | none | Not needed (no specular signal) |
-| View/projection, camera delta, frame index, reset | recorded per occurrence | Derivable. `historyContinuous == false` maps to reset. |
-| AO add-on (R8) | `spatial.x` contact visibility | Possible later; finite contact visibility, not physical AO |
-
-An FSR adapter would replace only `IndirectReconstruction`. Game semantics, source ownership, GI generation and composition would stay unchanged. Evaluation needs D3D12 runtime qualification on RDNA4 and a separate backend work package compared against this baseline.
+| AO | `spatial.x` contact visibility | stochastic per-occurrence sampling. Today it is a fixed 12-direction deterministic term, so a temporal denoiser gains nothing. Owned by spatial visibility. |
+| Dominant-light visibility | primary sun visibility (`visibility.x`) | cone-sampled shadow rays with hit distance and a light angular radius. Today it is a single hard ray. |
+| Direct diffuse | none | a demodulated local direct radiance signal; composition computes local direct analytically |
+| Indirect / direct specular, specular occlusion | none | specular transport and specular albedo |

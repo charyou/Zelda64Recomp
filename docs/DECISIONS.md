@@ -336,3 +336,85 @@ Cost. Resources are allocated only while the temporal consumer is active: +32 B/
 - RGBA16F motion guide;
 - two RGBA16F history targets, one written per occurrence and read by composition;
 - two packed R32 previous guides (FP16 linear depth, 6:6 octahedral normal, 4-bit history length).
+
+## ADR-018 — D3D12 is an RT+ backend qualified on the final image; FSR Ray Regeneration is an optional history backend; receiver combiners accept SHADE-free first cycles
+
+Status: accepted, 2026-09-26; amended the same day (final-image correction, fix 7 below). Extends ADR-004, ADR-011 and ADR-017. Evidence: [INDIRECT_RECONSTRUCTION.md](INDIRECT_RECONSTRUCTION.md), [RUNTIME_VALIDATION.md](RUNTIME_VALIDATION.md).
+
+**D3D12.** The RDNA4 gate that forced Vulkan on drivers up to Aug 2026 (the installed 32.0.31041.1004 is exactly that version) had no reproducing driver defect. The Sep 2026 D3D12 crash was the raster-varying ABI issue fixed under ADR-004. Genuine D3D12 RT+ needed six generic fixes. None is hardware-specific:
+1. **Runtime-specialized raster shaders.** DXC's `lib_6_3` validator rejects a scalar entry parameter that reaches the external library call. The D3D12-only runtime-compiled entries now spell scalar varyings `float1` and write `SV_Coverage` through a local. Without this, every specialized shader aborted the process. Vulkan uses specialization constants and never compiled this text.
+2. **Post-blend dither PS signature.** It skipped the `TEXCOORD1/2` varyings that RT+ added to `RasterVS`. D3D12 links stages by packed signature order (Vulkan links by location), so those PSOs failed and were bound as null. The ADR-004 consequence ("any new varying requires D3D12 validation") had not been exercised for those varyings.
+3. **Plume DXR root signatures.** The state object associated the application layout as a *local* root signature, while recording binds it globally, as Vulkan does. The layout is now the global root signature, exports use an empty local root signature, and shader records hold only identifiers.
+4. **RT+ read-write textures.** They were created `STORAGE` only. Plume derives D3D12 UAV capability from `UNORDERED_ACCESS`, so every RT+ UAV descriptor was invalid and removed the device with `DXGI_ERROR_INVALID_CALL`.
+5. **Plume `copyTextureRegion`.** It set sample positions on a null texture for placed-footprint (readback) destinations.
+6. **Diagnostics.** Failures of PSO creation and command-list `Close` are logged. DRED is available with `PLUME_D3D12_DRED=1`.
+7. **Plume D3D12 descriptor heap layout (amendment).** `D3D12DescriptorSet` gave immutable samplers a view-heap slot, while `D3D12PipelineLayout` turns them into static samplers without advancing the table offset. Every view declared after an immutable sampler was therefore written N slots after where the root signature reads it. RT64's common raster set has 18 immutable samplers at bindings 7–24. Upstream raster shaders never read that set above binding 6, so the defect was latent. Enhanced per-pixel lighting reads `rasterLights` (t37) and the normal and world-transform buffers (t68–t70), and on D3D12 got zero lights and zero normals. Only the GI-reconstructed ambient survived, so the final raster was about half as bright, and surfaces went black without GI. Fix: immutable samplers take no heap slot, and `setSampler` ignores them. This is a generic Plume backend bug, still present in upstream Plume `main` (`d723793`), and a separate upstream candidate.
+
+`Auto` keeps Vulkan on RDNA4, because it remains the primary qualified path. An explicit D3D12 choice is honored. D3D12 and Vulkan produce equivalent RT+ signals, within the harness's run-to-run floor, and equal product cost.
+
+**Correction (amendment).** The original qualification compared only intermediate RT+ signals (raw and reconstructed indirect). Those are produced by passes whose descriptor sets have no immutable sampler before a view, so they were correct, while the final raster was not. It did not establish final-image equivalence: a read-only audit (`_working-directory/diagnostics/2026-09-26-visual-regression-readonly/REPORT.md`) measured D3D12 final raster at about 50% of Vulkan's mean luminance in the same state. After fix 7, the same candidate matches Vulkan's final composed raster at 2134×1200 in Clock Town at noon with Atmospheric fog (mean luminance 0.2531 vs 0.2532), at noon with Original fog (0.2466 vs 0.2466) and at 23:00 (0.1981 vs 0.1977). Residual differences are limited to animated actors, flame and flicker-light phase. Backend qualification is now judged on the final composed image as well as on intermediate signals (RUNTIME_VALIDATION.md).
+
+**Ray Regeneration.** AMD FSR Ray Regeneration 1.2 is an optional temporal backend of the bounded diffuse GI consumer, behind `IndirectReconstruction`.
+- **Selection:** `RT64_RT_GI_RECONSTRUCTION=rayregen`. It is compiled only with `RT64_FFX_SDK_DIR`, the MIT FidelityFX API headers, which are not vendored. It is loaded at runtime from `amd_fidelityfx_loader_dx12.dll`.
+- **Fallback:** if the backend is unavailable (Vulkan, missing DLL, no provider, SM < 6.6), the project temporal backend runs and the reason is logged.
+- **Boundary:** the ADR-011/017 boundary is unchanged:
+  - The project spatial stage still runs first. Its support confidence is output W, so composition validity and authority are identical across backends.
+  - An adapter pass converts only the canonical guides:
+    - linear depth = clip W;
+    - normals in the vendor octahedral encoding, roughness 1;
+    - material channel = canonical signal validity: 0 active, 1 for pixels whose raw W < 0. Without it the vendor mixed their zero RGB into receivers (0.68 energy at the border). It encodes no material semantics.
+    - motion: the canonical guide for admissible surfaces, and best-effort camera-only reprojection of the primary hit where the guide is inadmissible. The vendor owns disocclusion.
+    - diffuse albedo: the labelled neutral-white proxy. Specular albedo is left zero-initialized, as the contract requires without a specular signal.
+  - **View space.** The vendor's view space is +Z-forward. N64 views look down −Z. The adapter mirrors the view in Z and folds the mirror and the trace screen transform into the projection. `view × projection` equals the traced transform, and canonical motion Z needs no conversion.
+  - **Projection split.** The projection is `inverse(view) × viewProjection`. It must be a perspective; otherwise that occurrence uses the spatial result and the next vendor dispatch resets. This fails closed for views supplied by mods.
+  - **Tuning.** Stability bias defaults to 0.25, overridable with `RT64_RT_RAYREGEN_CONFIG`. The vendor default of 1.0 biased converged GI to 0.86 of the spatial estimate on RT+'s sparse four-ray signal. Pre-exposure and outlier clipping had no effect.
+
+**Evaluation (2134×1200, D3D12, Clock Town noon).**
+
+| | Project temporal | Ray Regeneration |
+|---|---|---|
+| Composition-input noise, still | 0.00088 | 0.00045 |
+| Composition-input noise, fast turn | 0.00122 | 0.00036 |
+| Reprojected instability, turn | 0.00090 | 0.00077 |
+| Energy vs spatial | 0.997 | 0.98–0.99 |
+| Reconstruction cost | 0.40 ms | 3.39 ms (+3.0 ms) |
+| Resident memory | about 82 MB | 321 MiB vendor (236 MiB aliasable) plus about 100 MB adapter |
+
+Ray Regeneration also softens real low-frequency contact detail during motion.
+
+It works cleanly behind the boundary and is the better denoiser. At RT+'s current signal budget it is not a better product default: about 8× the cost of the project backend, for a component that is a bounded share of ambient. It remains an optional, qualified experiment.
+
+**Faceting** originates in the signal and the guide, not in reconstruction. GI is gathered over the per-triangle geometric normal, and the normal guide is that same normal (about 11–12° across soft edges on low-poly actors). The absolute edge step is about 0.002–0.006 luminance in every backend, raw included. Lower-noise backends only make it relatively more visible (edge/interior ratio 1.4 raw, 1.9 spatial, 4.1 project, 14.8 Ray Regeneration). Normal semantics were not changed.
+
+**Other signals.** The other Ray Regeneration signals were assessed and not integrated:
+- AO would need stochastic per-occurrence sampling of spatial visibility, which today is a fixed deterministic 12-direction term.
+- Dominant-light visibility needs cone-sampled shadow rays with hit distance and an angular radius. Today it is a single hard ray.
+- Direct diffuse needs a demodulated local direct radiance signal; composition computes local direct analytically.
+- No specular signal exists.
+
+Each belongs to the feature that owns the signal, not necessarily to `IndirectReconstruction`.
+
+**Receiver combiners.** The CPU receiver gate `spatialCombiner` was the only active receiver rejector:
+- 34 of 460 surfaces in Clock Town;
+- **48% of visible RT-hit pixels**, including the large building walls and Link's tunic, which rendered almost black under the sun shadow while neighbouring receivers got GI fill.
+
+The rejected forms were `(TEXEL1·TEXEL0)` or `(TEXEL0·PRIMITIVE)` in cycle 0, followed by `COMBINED·SHADE`. Both are pure products with SHADE. The second is the same product as an accepted form, reordered. A SHADE-free cycle 0 is now accepted, but only as the operand of a following `COMBINED × SHADE`. Its inputs are limited to textures, PRIM/ENV colours and their alphas, LOD fractions, ONE and ZERO. This keeps the final colour a pure product with SHADE: no additive or emissive term, no noise, key or YUV inputs, and alpha still gated by the opaque test. Combiners without SHADE stay rejected. Visible RT-hit coverage rose from 52% to 100% in the capture.
+
+*Amendment:* the "almost black in sun shadow" evidence above was measured on D3D12 before fix 7, when those surfaces had no per-pixel lights at all. On a correct backend, the widening's visible effect is smaller.
+- On Vulkan, frozen `cand-f` → `cand-g` in Clock Town at noon: mean luminance 0.2600 → 0.2535, 13% of pixels change by more than 0.05.
+- The change is confined to the newly admitted walls, stall fabric and Link. Those surfaces now take RT+ ambient composition instead of authored fill. The sun-shadowed brickwork becomes slightly lower in contrast, and the orange wall a little greyer.
+- Exposure, sky, fog and unaffected geometry are unchanged.
+
+This is the expected consequence of the eligibility change, not a regression. Whether that artistic balance is right is part of the still-open cross-scene receiver qualification.
+
+The durable receiver contract is in [SPATIAL_LIGHTING.md](SPATIAL_LIGHTING.md#receiver-and-ownership-boundary): the principle, the per-draw gate, the accepted and rejected forms, and game-agnostic rule vs. MM-only qualification. It is pinned by `rt64_spatial_receiver_fixture`. The widening is independently revertible: the predicate hunk and the fixture's two widened cases.
+
+This is receiver eligibility only. Source authority, historical-light ownership and the all-or-nothing trait bundle are unchanged. The GPU `authoredFillResponse` predicate already accepted these forms.
+
+**Rejected:**
+- keeping the RDNA4 gate without a reproducing driver defect;
+- an Agility SDK dependency to get debug layers (the diagnosis used DRED and an in-process trace);
+- substituting SHADE, `surfaceResponse` or authored colour for the albedo proxy;
+- encoding motion inadmissibility as zero motion;
+- making Ray Regeneration the default at the current cost;
+- per-scene or per-texture receiver exceptions.

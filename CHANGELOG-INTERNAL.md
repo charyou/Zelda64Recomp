@@ -1,5 +1,82 @@
 # Internal Changelog
 
+## 2026-09-26 — Pre-commit closure pass
+
+- **Receiver contract** made durable in SPATIAL_LIGHTING.md, with the widening behaviour unchanged:
+  - the principle (monotonic pure product with SHADE) and the per-draw gate with its rejection reasons;
+  - the accepted and rejected combiner forms;
+  - independence from source authority;
+  - a game-agnostic rule with MM-only qualification.
+
+  ADR-018 links to it.
+- **User's exploratory observations** (cutscenes, shop/sheet surfaces without GI, slight night flicker, unclear intro ground participation) are recorded as future qualification targets. They are not attributed to the widening.
+- **New `rt64_spatial_receiver_fixture`:** header-only, 17 accepted/rejected cases. It passes, and against the pre-widening predicate it fails exactly the two widened cases.
+- **Debug hooks** reviewed. All are env-gated and kept; nothing was removed.
+- **Commit plan:** `_working-directory/diagnostics/2026-09-26-d3d12-perpixel/commit-plan/COMMIT_PLAN.md`.
+  - Nine index-only patches (Plume P1–P4, RT64 R2a–R5) plus a gitlink and parent steps.
+  - Verified to reproduce the tree exactly, and R4/R5 are independently revertible.
+  - Each Plume hunk is classified for upstream. The descriptor layout (P1) and readback copy (P2) are strong standalone candidates; the DXR root-signature change (P3) changes the contract and needs discussion first; the diagnostics (P4) are optional.
+- No commits.
+
+## 2026-09-26 — D3D12 Enhanced lighting energy loss: Plume descriptor-layout fix (ADR-018 amendment)
+
+- **Cause:** a Plume D3D12 bug.
+  - `D3D12DescriptorSet` allocated view-heap slots for immutable samplers, while `D3D12PipelineLayout` makes them static samplers without advancing the table offset. Views after them were read N slots early.
+  - RT64's common raster set has 18 immutable samplers (bindings 7–24), so per-pixel lighting's t37 lights and t68–t70 normals and world transforms read zero on D3D12.
+  - Latent since per-pixel lighting was introduced; exposed once D3D12 ran here.
+- **Fix:** immutable samplers take no heap slot, and `setSampler` ignores them (`plume_d3d12.{h,cpp}`). No RT64 or parent changes. This is an upstream candidate: Plume `main` `d723793` is still affected.
+- **Diagnosis:** one A/B of diagnostic view 12 (normal magnitude and normal length) showed zero per-pixel inputs on D3D12. The Plume fix alone restored them.
+- **Qualification** (same binary, 2134×1200, final composed raster, inspected at full resolution):
+
+  | State | Vulkan | D3D12 |
+  |---|---|---|
+  | Noon, Atmospheric | 0.2532 | 0.2531 (pre-fix 0.1252) |
+  | Noon, Original | 0.2466 | 0.2466 (pre-fix 0.1126) |
+  | 23:00 | 0.1977 | 0.1981 (pre-fix 0.0862) |
+
+  - Residuals are only animated actors and flicker.
+  - Per-pixel with RT features off was black on pre-fix D3D12 and now matches Vulkan. The D3D12 menu is fine.
+- **Why missed:** the previous qualification scored intermediate RT+ signals, whose descriptor sets are unaffected, and never compared final images across APIs. RUNTIME_VALIDATION now requires a final-image cross-API check.
+- **Pre-session oracle:** temporal `4B25C202…` on Vulkan, unchanged executable, externally resized to the same 2134×1200 target, 9 stitched native 640×360 tiles plus window captures.
+  - Mean luminance 0.2592 vs current 0.2532.
+  - Fully attributed to the receiver widening (`cand-f` → `cand-g` on Vulkan: 0.2600 → 0.2535). The other steps are at the run-to-run floor.
+  - The change is local (walls, stall fabric, Link; flatter brick shadow); no global shift.
+  - The widening's earlier "near-black walls" evidence came from pre-fix D3D12.
+- **Candidate:** `_working-directory/diagnostics/2026-09-26-d3d12-perpixel/cand-fix` `7EA5C05A…8B2F`. Evidence and scripts are in that directory (`REPORT.md`). No commits.
+- **Release-note summary:** Fixed Enhanced per-pixel lighting on Direct3D 12, which rendered lit surfaces black, or about half as bright with RT+ lighting, because lights and normals were read from the wrong descriptors.
+
+## 2026-09-26 — D3D12 RT+ qualification, FSR Ray Regeneration backend, receiver combiner widening (ADR-018)
+
+- **D3D12 achieved on the RX 9070 XT** (driver 32.0.31041.1004 = the gated version). The gate was stale.
+  - Blockers were found in order with an in-process crash trace, DRED and op tracing (no debug layer was available).
+  - Six generic fixes: DXC `lib_6_3` scalar-entry rejection in runtime-specialized raster shaders; post-blend PS signature order; Plume DXR local-vs-global root signature; RT+ UAV textures without `UNORDERED_ACCESS`; Plume null-texture sample positions on readback copies; PSO/`Close` logging plus DRED.
+  - D3D12 vs Vulkan: >99% of RT+ signal pixels are identical, and the differences lie within the harness's own run-to-run floor. Costs are equal.
+  - `Auto` keeps Vulkan on RDNA4; an explicit D3D12 choice is honored.
+- **Ray Regeneration 1.2** is an optional `IndirectReconstruction` temporal backend (`RT64_RT_GI_RECONSTRUCTION=rayregen`, built with `RT64_FFX_SDK_DIR`, DLLs loaded at runtime, logged fallback).
+  - The mapping held. Additions found at runtime:
+    - material channel = GI validity (stops inactive-pixel bleed: 0.68 → 0.82 edge energy);
+    - zero specular albedo (vendor validator);
+    - stability bias 0.25 (the vendor default 1.0 converged to 0.86 of spatial energy).
+  - Pre-exposure and outlier clip had no effect; the pre-exposure override was removed.
+- **Product-resolution evaluation** (2134×1200, D3D12):
+  - Ray Regeneration noise 0.00045 (still) / 0.00036 (turn) vs project 0.00088 / 0.00122. Turn instability 0.00077 vs 0.00090. Energy 0.98–0.99.
+  - Cost 3.39 vs 0.40 ms reconstruction (whole Workload 6.49 vs 3.40 ms). Memory 321 MiB vendor (236 MiB aliasable) plus about 100 MB adapter, vs 82 MB.
+  - Ray Regeneration softens contact detail in motion. It is not made the default.
+- **Faceting:** present in raw GI and the per-triangle geometric-normal guide (11–12° across soft edges). The absolute edge step is equal across backends; lower noise only exposes it more.
+- **Receiver audit:** the CPU combiner gate was the only active rejector, covering 48% of visible RT-hit pixels (Clock Town walls, Link's tunic, near-black in sun shadow).
+  - Forms: `TEXEL1·TEXEL0` or `TEXEL0·PRIM` in cycle 0, then `COMBINED·SHADE`.
+  - Generic widening: a SHADE-free cycle 0 is accepted when followed by `COMBINED × SHADE`. Coverage is now 100%; final mean luminance 0.110 → 0.116. Vulkan and RT+-off smoke runs are clean.
+  - Receiver rows now include the decoded colour combiner.
+- **Other RR signals** (AO, dominant light, direct, specular): not integrated; each needs new signal policy.
+- **New dev hooks:** `ZELDA64RECOMP_CRASH_TRACE`, `PLUME_D3D12_DRED`, `ZELDA64RECOMP_DEV_WINDOW_SIZE`, `RT64_LIGHTING_CAPTURE_SLICE_MIB`, `RT64_RT_RAYREGEN_CONFIG`, `RT64_RT_RAYREGEN_VALIDATION`.
+- **Binaries:**
+  - `cand-a` `0D81599F…` (D3D12 fixes, API equivalence);
+  - `cand-e` / `cand-f` `0779E81A…` / `886D5B58…` (product matrix and benchmarks);
+  - `cand-g` `51DC50A0…` (receiver widening A/B);
+  - final `E2458055…1F57`.
+  - All are in `_working-directory/diagnostics/2026-09-25-d3d12-rr/`. No commits.
+- **Release-note summary:** Direct3D 12 now works with Enhanced RT+ lighting on AMD RDNA4 when selected explicitly. RT+ indirect lighting now also reaches textured surfaces that blend two textures or a primitive tint before lighting, such as Clock Town walls and Link's tunic, which previously stayed unlit in shadow. An experimental AMD FSR Ray Regeneration denoiser is available for developer evaluation on Direct3D 12.
+
 ## 2026-09-25 — Temporal GI reconstruction with geometric history validity (ADR-017)
 
 - **Decision (ADR-017, ADR-016 amendment):** WP3 identity, continuity and motion are candidate lineage and motion admissibility only. History validity belongs to the consumer: geometric agreement of stored previous depth and normal with the reprojected surface, occurrence continuity and current validity. Identity never authorizes history. Old WP2 source collection is not a prerequisite; its resumption triggers are recorded. WP3 code is unchanged, and the identity fixture output is byte-identical.

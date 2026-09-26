@@ -5,7 +5,59 @@
 Implemented 2026-09-14. Build/runtime continuation evidence: HANDOFF.md. Source facts: ASTRA_LIGHTING_ADDENDUM.md. RT64 contains generic source/receiver policy only.
 
 ## Receiver and ownership boundary
-Executable opaque depth-writing world-camera perspective geometry is the scene boundary. Receiver eligibility is independent of caster membership and original-light ownership. Supported monotonic SHADE combiners include texture-times-SHADE, pure SHADE, primitive/environment modulation and conventional texture LOD followed by SHADE. Original unlit vertex colors and supported authored light sets qualify. RGBA-modified vertices, ambiguous sets, special/additive arithmetic, cutouts and non-world cameras do not.
+A **receiver** is a surface that RT+ may shade with spatial/indirect response. Eligibility is a statement about how the surface's final colour responds to SHADE. It is not a statement about which lights the surface owns: receiver eligibility is independent of caster membership, source authority and original-light ownership (ADR-011, ADR-013, ADR-018). Accepting a receiver never grants ownership of an original light term.
+
+**Principle.** A surface is a receiver only when its final colour is a *monotonic pure product with SHADE*. Replacing or rescaling SHADE then scales the authored result without changing its artwork, and no additive, emissive or special-arithmetic term can be amplified. Anything that cannot be shown to have that form falls back to the existing rendering.
+
+**Per-draw gate** (CPU, `rt64_framebuffer_renderer.cpp`; first rejection reason recorded in receiver rows):
+- The RT scene boundary: opaque, depth-writing, perspective geometry whose projection is the RT world projection. Otherwise `projection_mismatch`.
+- World camera. Otherwise `world_camera_mismatch`.
+- No RSP-modified vertex RGBA. Otherwise `modified_vertex_color`.
+- Unlit authored vertex colour, or a supported authored light set. Otherwise `lighting_fallback`.
+- `spatialCombiner` (`shared/rt64_spatial_receiver.h`) accepts the colour combiner. Otherwise `unsupported_spatial_combiner`.
+
+Per pixel, the raster then requires the RT primary hit to be the same instance at the same clip W. A mismatch uses the draw's normal fallback (diagnostic view 13).
+
+**Accepted combiner forms** (colour combiner `(a − b) × c + d`; in 1-cycle mode only the second cycle is evaluated):
+- In either cycle:
+  - `TEXEL0/1 × SHADE` or `SHADE × TEXEL0/1`;
+  - pure `SHADE` (`d = SHADE` with a zero product);
+  - `SHADE × PRIM/ENV`.
+- Second cycle after one of those products:
+  - `COMBINED` pass-through;
+  - `COMBINED × PRIM/ENV` modulation.
+- First cycle that is entirely **SHADE-free**, followed by `COMBINED × SHADE`. SHADE-free inputs are texels, PRIM/ENV colours and their alphas, LOD fractions, ONE and ZERO. This covers texture LOD/detail blends, texture products such as `TEXEL1 × TEXEL0`, and constant tints such as `TEXEL0 × PRIM`.
+  - Widened 2026-09-26 (ADR-018). Before that, only LOD/detail blends were accepted here, which left Clock Town walls and Link's tunic unlit by RT+ indirect.
+
+**Deliberately rejected:**
+- no SHADE response at all;
+- any additive or emissive term beside the SHADE product (for example `TEXEL0 × SHADE + PRIM`, or `COMBINED × SHADE + ENV`);
+- SHADE applied twice (`TEXEL0 × SHADE`, then `COMBINED × SHADE`);
+- noise, chroma key (`KEY_CENTER`/`KEY_SCALE`), K4/K5, `COMBINED_ALPHA` or `SHADE_ALPHA` inputs in a SHADE-free stage;
+- cutouts, RGBA-modified vertices, ambiguous light sets and non-world cameras (per-draw gate above).
+
+Alpha is not part of this predicate; the opaque boundary gates it. The GPU `authoredFillResponse` predicate (`SpatialLighting.hlsli`) is a separate, already broader check for authored fill. `rt64_spatial_receiver_fixture` (`tests/spatial_receiver_fixture.cpp`) pins representative accepted and rejected forms. Against the pre-widening predicate it fails exactly the two widened cases.
+
+**Scope of the rule vs. its qualification.** The rule is game-agnostic: it reads only RDP combiner and RSP state, with no scene, actor, texture or asset identity. It applies to vanilla and modded content alike. Runtime qualification so far is Majora's Mask only, mainly Clock Town (noon and night, Vulkan and D3D12). It does **not** establish qualification for other games or for heavily modded content.
+
+Future evidence may justify further generic widening, for example other provably monotonic SHADE forms. That would be a separate decision with its own fixture cases; it is not open work.
+
+**Exploratory observations (2026-09-26, human, not deterministic evidence, not diagnosed):**
+- Overall the widening looked visually beneficial across several further Clock Town views, including night, with no broad regression seen.
+- In several cutscenes, some content appeared not to receive the widened treatment, or only partially.
+- Some indoor/shop surfaces, including sheet-like geometry, appeared to receive no GI.
+- Outdoors at night, very slight flicker was seen on some geometry, which appeared to alternate between recognized and not recognized.
+- During the long intro, especially on very large ground surfaces, it was unclear whether GI/receiver participation was active.
+
+These are future qualification targets, not attributed to the widening.
+
+Each should first be classified with the existing instrumentation: receiver rows and first-rejection reasons, diagnostic views 6/13/14, and RT scene series. The candidate classes are:
+- intended eligibility rejection (combiner, modified colour, lighting fallback);
+- unstable receiver classification (per-draw traits or per-pixel instance/clip-W match changing between frames);
+- geometry missing from the submitted RT scene;
+- missing GI support or reconstruction (invalid raw W, low confidence);
+- expected fallback for cutscene or non-world cameras.
+
 CPU-only modifiedColor provenance follows RSP loads/copies/edits; lightCount is unchanged. Surface.w capabilities: receiver1, authored-lit2, authored-color4, local8, indirect16. Geometric normals support authored-color response without treating RGB as normals or claiming recovered material properties.
 SemanticLight.response.w explicitly authorizes unowned spatial strength (zero denies). MM verified receipts grant .35. Exact frame source snapshots deduplicate, capped64. A receiver ranks four local-direct contributors by finite influence and excludes its bound source terms. Source shadow policy remains independent. Run-4 owned replacement bits/equation are unchanged. Unowned direct is capped .3 before authority gain; combined artistic addition capped .3..45.
 
